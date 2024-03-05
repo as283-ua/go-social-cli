@@ -10,7 +10,7 @@ import (
 	"time"
 	"util"
 
-	"golang.org/x/crypto/scrypt"
+	"golang.org/x/crypto/argon2"
 )
 
 type user struct {
@@ -69,7 +69,7 @@ func handle(writer http.ResponseWriter, req *http.Request) {
 		password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
 
 		// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-		u.Hash, _ = scrypt.Key(password, u.Salt, 16384, 8, 1, 32)
+		u.Hash = argon2.Key(password, u.Salt, 3, 32*1024, 4, 32)
 
 		u.Seen = time.Now()        // asignamos tiempo de login
 		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
@@ -85,9 +85,9 @@ func handle(writer http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		password := util.Decode64(req.Form.Get("pass"))          // obtenemos la contraseña (keyLogin)
-		hash, _ := scrypt.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-		if !bytes.Equal(u.Hash, hash) {                          // comparamos
+		password := util.Decode64(req.Form.Get("pass"))       // obtenemos la contraseña (keyLogin)
+		hash := argon2.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
+		if !bytes.Equal(u.Hash, hash) {                       // comparamos
 			response(writer, false, "Credenciales inválidas", nil)
 
 		} else {
