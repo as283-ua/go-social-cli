@@ -77,7 +77,7 @@ func main() {
 	encPriv := util.Encrypt(compPriv, keyData) // ciframos con la clave de datos privados
 	data.Set("prikey", util.Encode64(encPriv)) // a base64
 
-	r, err := client.PostForm("https://localhost:10443", data) // enviamos por POST
+	r, err := client.PostForm("https://localhost:10443/register", data) // enviamos por POST
 	chk(err)
 	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
 	r.Body.Close()             // hay que cerrar el reader del body
@@ -88,10 +88,10 @@ func main() {
 	*/
 	fmt.Print("\n\nLOGIN\n\n")
 	data = url.Values{}
-	data.Set("cmd", "login")                                  // comando (string)
-	data.Set("user", "usuario")                               // usuario (string)
-	data.Set("pass", util.Encode64(keyLogin))                 // contraseña (a base64 porque es []byte)
-	r, err = client.PostForm("https://localhost:10443", data) // enviamos por POST
+	data.Set("cmd", "login")                                        // comando (string)
+	data.Set("user", "usuario")                                     // usuario (string)
+	data.Set("pass", util.Encode64(keyLogin))                       // contraseña (a base64 porque es []byte)
+	r, err = client.PostForm("https://localhost:10443/login", data) // enviamos por POST
 	chk(err)
 	resp := Resp{}
 	json.NewDecoder(r.Body).Decode(&resp) // decodificamos la respuesta para utilizar sus campos más adelante
@@ -127,7 +127,7 @@ func main() {
 	data.Set("user", "usuario")                  // usuario (string)
 	data.Set("pass", util.Encode64(keyLogin))    // contraseña (a base64 porque es []byte)
 	data.Set("token", util.Encode64(resp.Token)) // token correcto
-	r, err = client.PostForm("https://localhost:10443", data)
+	r, err = client.PostForm("https://localhost:10443/data", data)
 	chk(err)
 	io.Copy(os.Stdout, r.Body) // mostramos el cuerpo de la respuesta (es un reader)
 	r.Body.Close()             // hay que cerrar el reader del body
