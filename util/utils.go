@@ -9,6 +9,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"io"
 )
@@ -72,4 +73,11 @@ func Decode64(s string) []byte {
 	b, err := base64.StdEncoding.DecodeString(s) // recupera el formato original
 	chk(err)                                     // comprobamos el error
 	return b                                     // devolvemos los datos originales
+}
+
+// función para resumir (SHA256)
+func Hash(data []byte) []byte {
+	h := sha256.New() // creamos un nuevo hash (SHA2-256)
+	h.Write(data)     // procesamos los datos
+	return h.Sum(nil) // obtenemos el resumen
 }
