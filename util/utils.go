@@ -16,6 +16,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -116,7 +117,7 @@ func WriteECDSAKeyToFile(filename string, key *ecdsa.PrivateKey) {
 		Bytes: keyBytes,
 	}
 
-	privFile, err := os.Create(filename)
+	privFile, err := os.Create("keys/" + filename)
 	FailOnError(err)
 	defer privFile.Close()
 
@@ -133,7 +134,7 @@ func WriteRSAKeyToFile(filename string, key *rsa.PrivateKey) {
 		Bytes: keyBytes,
 	}
 
-	privFile, err := os.Create(filename)
+	privFile, err := os.Create("keys/" + filename)
 	FailOnError(err)
 	defer privFile.Close()
 
@@ -150,7 +151,7 @@ func WritePublicKeyToFile(filename string, publicKey *rsa.PublicKey) []byte {
 		Bytes: pubBytes,
 	}
 
-	pubFile, err := os.Create(filename)
+	pubFile, err := os.Create("keys/" + filename)
 	FailOnError(err)
 
 	defer pubFile.Close()
@@ -162,7 +163,7 @@ func WritePublicKeyToFile(filename string, publicKey *rsa.PublicKey) []byte {
 }
 
 func ReadECDSAKeyFromFile(filename string) *ecdsa.PrivateKey {
-	privFile, err := os.Open(filename)
+	privFile, err := os.Open("keys/" + filename)
 	FailOnError(err)
 	defer privFile.Close()
 
@@ -182,7 +183,7 @@ func ReadECDSAKeyFromFile(filename string) *ecdsa.PrivateKey {
 }
 
 func ReadRSAKeyFromFile(filename string) *rsa.PrivateKey {
-	privFile, err := os.Open(filename)
+	privFile, err := os.Open("keys/" + filename)
 	FailOnError(err)
 	defer privFile.Close()
 
@@ -202,7 +203,7 @@ func ReadRSAKeyFromFile(filename string) *rsa.PrivateKey {
 }
 
 func ReadPublicKeyBytesFromFile(filename string) []byte {
-	pubFile, err := os.Open(filename)
+	pubFile, err := os.Open("keys/" + filename)
 	FailOnError(err)
 	defer pubFile.Close()
 
@@ -234,6 +235,7 @@ func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) []byte {
 
 func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
 	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
+	fmt.Println("cosa,", string(out))
 	FailOnError(err)
 	return out
 }

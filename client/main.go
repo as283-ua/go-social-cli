@@ -48,7 +48,7 @@ func registerCmdLine(client *http.Client) models.Resp {
 	var privateKey *rsa.PrivateKey
 	if _, err := os.Stat(fmt.Sprintf("%s.key", username)); err != nil {
 		// no hay err -> el archivo no existe
-		pk, err := rsa.GenerateKey(rand.Reader, 1024)
+		pk, err := rsa.GenerateKey(rand.Reader, 2048)
 		privateKey = pk
 		util.FailOnError(err)
 
@@ -56,7 +56,7 @@ func registerCmdLine(client *http.Client) models.Resp {
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
 	} else {
-		_ = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		privateKey = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 
@@ -69,8 +69,11 @@ func registerCmdLine(client *http.Client) models.Resp {
 	}
 
 	r := util.DecodeJSON[models.Resp](resp.Body)
-	r.Msg = string(util.DecryptWithRSA([]byte(r.Msg), privateKey))
-	fmt.Println(r)
+	util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+
+	// fmt.Println(mensaje)
+
+	// util.DecryptWithRSA(util.EncryptWithRSA([]byte("hola"), util.ParsePublicKey(publicKeyBytes)), privateKey)
 
 	resp.Body.Close()
 	return r
@@ -94,6 +97,7 @@ func loginCmdLine(client *http.Client) models.Resp {
 	}
 
 	r := util.DecodeJSON[models.Resp](resp.Body)
+	r.Msg = string(util.Decode64(r.Msg))
 	fmt.Println(r)
 
 	resp.Body.Close()

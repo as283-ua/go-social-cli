@@ -138,7 +138,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := models.Resp{Ok: ok, Msg: msg, Token: token}
+	r := models.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }
