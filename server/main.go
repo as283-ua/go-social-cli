@@ -2,146 +2,142 @@ package main
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 	"util"
+	"util/models"
 
 	"golang.org/x/crypto/argon2"
 )
 
-type user struct {
-	Name  string            // nombre de usuario
-	Hash  []byte            // hash de la contraseña
-	Salt  []byte            // sal para la contraseña
-	Token []byte            // token de sesión
-	Seen  time.Time         // última vez que fue visto
-	Data  map[string]string // datos adicionales del usuario
-}
+var UserNames = make([]string, 0)
+var Users = make(map[string]models.User)
 
-var gUsers map[string]user
+// Se guardan las claves públicas de los usuarios para que puedan iniciar una conversación privada entre ellos
+var UserPubKeys = make(map[string]crypto.PublicKey)
 
-func chk(e error) {
-	if e != nil {
-		logger.Error(e.Error())
-		panic(e)
-	}
-}
+// PK = User name
+var UserPosts = make(map[string][]models.Post)
 
-func getLogger() *slog.Logger {
-	return slog.New(slog.Default().Handler())
-}
+// PK = Post id
+var PostComments = make(map[int][]models.Comments)
 
-var logger = getLogger()
+// var UserFollowers map[string][]string
+// var UserFollowing map[string][]string
+
+var logger = util.GetLogger()
 
 func main() {
-	http.HandleFunc("/register", register)
-	http.HandleFunc("/login", login)
-	http.HandleFunc("/data", data)
+	Users = make(map[string]models.User)
 
-	gUsers = make(map[string]user)
-	logger.Info("Your server is running on https://localhost:10443")
-	err := http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil)
+	http.HandleFunc("/register", registerHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/users", usersHandler)
 
-	chk(err)
+	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
+	util.FailOnError(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
 }
 
-func register(writer http.ResponseWriter, req *http.Request) {
-	err := req.ParseForm()
-	writer.Header().Set("Content-Type", "text/plain")
-	chk(err)
+func usersHandler(w http.ResponseWriter, req *http.Request) {
+	query := req.URL.Query()
+	pageStr := query.Get("page")
+	sizeStr := query.Get("size")
+	page := 0
+	size := len(UserNames)
 
-	_, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+	if pageStr != "" {
+		p, err := strconv.Atoi(pageStr)
+		util.FailOnError(err)
+		page = p
+	}
+	if sizeStr != "" {
+		s, err := strconv.Atoi(sizeStr)
+		util.FailOnError(err)
+		size = s
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	start := page * size
+	end := (page + 1) * size
+
+	if end >= len(UserNames) {
+		end = len(UserNames)
+	}
+
+	err := json.NewEncoder(w).Encode(UserNames[start:end])
+	util.FailOnError(err)
+}
+
+func registerHandler(w http.ResponseWriter, req *http.Request) {
+	register := util.DecodeJSON[models.Credentials](req.Body)
+	req.Body.Close()
+
+	logger.Info(fmt.Sprintf("Registro: %v\n", register))
+
+	w.Header().Set("Content-Type", "application/json")
+
+	_, ok := Users[register.User]
 	if ok {
-		response(writer, false, "Usuario ya registrado", nil)
+		response(w, false, "Usuario ya registrado", nil)
 		return
 	}
 
-	u := user{}
-	u.Name = req.Form.Get("user")                   // nombre
-	u.Salt = make([]byte, 16)                       // sal (16 bytes == 128 bits)
-	rand.Read(u.Salt)                               // la sal es aleatoria
-	u.Data = make(map[string]string)                // reservamos mapa de datos de usuario
-	u.Data["private"] = req.Form.Get("prikey")      // clave privada
-	u.Data["public"] = req.Form.Get("pubkey")       // clave pública
-	password := util.Decode64(req.Form.Get("pass")) // contraseña (keyLogin)
+	u := models.User{}
+	u.Name = register.User
+	u.Salt = make([]byte, 16)
+	rand.Read(u.Salt)
+	u.Data = make(map[string]string)
+	password := register.Pass
 
-	// "hasheamos" la contraseña con scrypt (argon2 es mejor)
-	u.Hash = argon2.Key(password, u.Salt, 3, 32*1024, 4, 32)
+	u.Hash = argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
 
-	u.Seen = time.Now()        // asignamos tiempo de login
-	u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
-	rand.Read(u.Token)         // el token es aleatorio
-
-	gUsers[u.Name] = u
-	response(writer, true, "Usuario registrado", u.Token)
-}
-
-func data(writer http.ResponseWriter, req *http.Request) {
-	err := req.ParseForm()
-	writer.Header().Set("Content-Type", "text/plain")
-	chk(err)
-
-	u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
-	if !ok {
-		response(writer, false, "No autentificado", nil)
-		return
-	} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
-		// sin token o con token expirado
-		response(writer, false, "No autentificado", nil)
-		return
-	} else if !bytes.EqualFold(u.Token, util.Decode64(req.Form.Get("token"))) {
-		// token no coincide
-		response(writer, false, "No autentificado", nil)
-		return
-	}
-
-	datos, err := json.Marshal(&u.Data) //
-	chk(err)
 	u.Seen = time.Now()
-	gUsers[u.Name] = u
-	response(writer, true, string(datos), u.Token)
+	u.Token = make([]byte, 16)
+	rand.Read(u.Token)
+
+	// logger.Info(util.Encode64(u.Token))
+
+	Users[u.Name] = u
+	UserNames = append(UserNames, u.Name)
+	response(w, true, "Usuario registrado", u.Token)
 }
 
-func login(writer http.ResponseWriter, req *http.Request) {
-	err := req.ParseForm()
-	writer.Header().Set("Content-Type", "text/plain")
-	chk(err)
+func loginHandler(w http.ResponseWriter, req *http.Request) {
+	login := util.DecodeJSON[models.Credentials](req.Body)
+	req.Body.Close()
 
-	u, ok := gUsers[req.Form.Get("user")] // ¿existe ya el usuario?
+	logger.Info(fmt.Sprintf("Login: %v\n", login))
+
+	w.Header().Set("Content-Type", "application/json")
+
+	u, ok := Users[login.User]
 	if !ok {
-		response(writer, false, "Usuario inexistente", nil)
+		response(w, false, "Usuario inexistente", nil)
 		return
 	}
 
-	password := util.Decode64(req.Form.Get("pass"))       // obtenemos la contraseña (keyLogin)
-	hash := argon2.Key(password, u.Salt, 16384, 8, 1, 32) // scrypt de keyLogin (argon2 es mejor)
-	if !bytes.Equal(u.Hash, hash) {                       // comparamos
-		response(writer, false, "Credenciales inválidas", nil)
-
+	password := login.Pass
+	hash := argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
+	if !bytes.Equal(u.Hash, hash) {
+		response(w, false, "Credenciales inválidas", nil)
 	} else {
-		u.Seen = time.Now()        // asignamos tiempo de login
-		u.Token = make([]byte, 16) // token (16 bytes == 128 bits)
-		rand.Read(u.Token)         // el token es aleatorio
-		gUsers[u.Name] = u
-		response(writer, true, "Credenciales válidas", u.Token)
+		u.Seen = time.Now()
+		u.Token = make([]byte, 16)
+		rand.Read(u.Token)
+		Users[u.Name] = u
+		response(w, true, "Credenciales válidas", u.Token)
 	}
-
 }
 
-type Resp struct {
-	Ok    bool   // true -> correcto, false -> error
-	Msg   string // mensaje adicional
-	Token []byte // token de sesión para utilizar por el cliente
-}
-
-// función para escribir una respuesta del servidor
 func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := Resp{Ok: ok, Msg: msg, Token: token} // formateamos respuesta
-	rJSON, err := json.Marshal(&r)            // codificamos en JSON
-	chk(err)                                  // comprobamos error
-	w.Write(rJSON)                            // escribimos el JSON resultante
+	r := models.Resp{Ok: ok, Msg: msg, Token: token}
+	err := json.NewEncoder(w).Encode(&r)
+	util.FailOnError(err)
 }
