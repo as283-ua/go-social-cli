@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -42,7 +44,23 @@ func registerCmdLine(client *http.Client) models.Resp {
 	password, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	util.FailOnError(err)
 
-	register := models.Credentials{User: strings.TrimRight(username, "\n"), Pass: strings.TrimRight(password, "\n")}
+	var publicKeyBytes []byte
+	var privateKey *rsa.PrivateKey
+	if _, err := os.Stat(fmt.Sprintf("%s.key", username)); err != nil {
+		// no hay err -> el archivo no existe
+		pk, err := rsa.GenerateKey(rand.Reader, 1024)
+		privateKey = pk
+		util.FailOnError(err)
+
+		// writeECDSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
+		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
+		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
+	} else {
+		_ = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
+	}
+
+	register := models.RegisterCredentials{User: strings.TrimRight(username, "\n"), Pass: strings.TrimRight(password, "\n"), PubKey: publicKeyBytes}
 	jsonBody := util.EncodeJSON(register)
 
 	resp, err := client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
@@ -51,6 +69,7 @@ func registerCmdLine(client *http.Client) models.Resp {
 	}
 
 	r := util.DecodeJSON[models.Resp](resp.Body)
+	r.Msg = string(util.DecryptWithRSA([]byte(r.Msg), privateKey))
 	fmt.Println(r)
 
 	resp.Body.Close()

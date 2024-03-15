@@ -1,5 +1,5 @@
 /*
-Funciones comunes y utilidades
+Funciones comunes y dades
 */
 package util
 
@@ -8,12 +8,17 @@ import (
 	"compress/zlib"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"log/slog"
+	"os"
 )
 
 func GetLogger() *slog.Logger {
@@ -85,7 +90,7 @@ func Decompress(data []byte) []byte {
 
 // función para codificar de []bytes a string (Base64)
 func Encode64(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data) // sólo utiliza caracteres "imprimibles"
+	return base64.StdEncoding.EncodeToString(data) // sólo za caracteres "imprimibles"
 }
 
 // función para decodificar de string a []bytes (Base64)
@@ -100,4 +105,135 @@ func Hash(data []byte) []byte {
 	h := sha256.New() // creamos un nuevo hash (SHA2-256)
 	h.Write(data)     // procesamos los datos
 	return h.Sum(nil) // obtenemos el resumen
+}
+
+func WriteECDSAKeyToFile(filename string, key *ecdsa.PrivateKey) {
+	keyBytes, err := x509.MarshalECPrivateKey(key)
+	FailOnError(err)
+
+	privBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: keyBytes,
+	}
+
+	privFile, err := os.Create(filename)
+	FailOnError(err)
+	defer privFile.Close()
+
+	err = pem.Encode(privFile, privBlock)
+	FailOnError(err)
+}
+
+func WriteRSAKeyToFile(filename string, key *rsa.PrivateKey) {
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	FailOnError(err)
+
+	privBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: keyBytes,
+	}
+
+	privFile, err := os.Create(filename)
+	FailOnError(err)
+	defer privFile.Close()
+
+	err = pem.Encode(privFile, privBlock)
+	FailOnError(err)
+}
+
+func WritePublicKeyToFile(filename string, publicKey *rsa.PublicKey) []byte {
+	pubBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	FailOnError(err)
+
+	pubBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubBytes,
+	}
+
+	pubFile, err := os.Create(filename)
+	FailOnError(err)
+
+	defer pubFile.Close()
+
+	err = pem.Encode(pubFile, pubBlock)
+	FailOnError(err)
+
+	return pubBytes
+}
+
+func ReadECDSAKeyFromFile(filename string) *ecdsa.PrivateKey {
+	privFile, err := os.Open(filename)
+	FailOnError(err)
+	defer privFile.Close()
+
+	info, err := privFile.Stat()
+	FailOnError(err)
+
+	size := info.Size()
+	privBytes := make([]byte, size)
+	_, err = privFile.Read(privBytes)
+	FailOnError(err)
+
+	privPem, _ := pem.Decode(privBytes)
+	privKey, err := x509.ParseECPrivateKey(privPem.Bytes)
+	FailOnError(err)
+
+	return privKey
+}
+
+func ReadRSAKeyFromFile(filename string) *rsa.PrivateKey {
+	privFile, err := os.Open(filename)
+	FailOnError(err)
+	defer privFile.Close()
+
+	info, err := privFile.Stat()
+	FailOnError(err)
+
+	size := info.Size()
+	privBytes := make([]byte, size)
+	_, err = privFile.Read(privBytes)
+	FailOnError(err)
+
+	privPem, _ := pem.Decode(privBytes)
+	privKey, err := x509.ParsePKCS8PrivateKey(privPem.Bytes)
+	FailOnError(err)
+
+	return privKey.(*rsa.PrivateKey)
+}
+
+func ReadPublicKeyBytesFromFile(filename string) []byte {
+	pubFile, err := os.Open(filename)
+	FailOnError(err)
+	defer pubFile.Close()
+
+	info, err := pubFile.Stat()
+	FailOnError(err)
+
+	size := info.Size()
+	pubBytes := make([]byte, size)
+	_, err = pubFile.Read(pubBytes)
+	FailOnError(err)
+
+	pubPem, _ := pem.Decode(pubBytes)
+
+	return pubPem.Bytes
+}
+
+func ParsePublicKey(pubBytes []byte) *rsa.PublicKey {
+	pubKey, err := x509.ParsePKIXPublicKey(pubBytes)
+	FailOnError(err)
+
+	return pubKey.(*rsa.PublicKey)
+}
+
+func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) []byte {
+	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, data, nil)
+	FailOnError(err)
+	return out
+}
+
+func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
+	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
+	FailOnError(err)
+	return out
 }

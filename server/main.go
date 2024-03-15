@@ -76,16 +76,17 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
-	register := util.DecodeJSON[models.Credentials](req.Body)
+	register := util.DecodeJSON[models.RegisterCredentials](req.Body)
 	req.Body.Close()
 
-	logger.Info(fmt.Sprintf("Registro: %v\n", register))
+	// logger.Info(fmt.Sprintf("Registro: %v\n", register))
 
 	w.Header().Set("Content-Type", "application/json")
 
 	_, ok := Users[register.User]
 	if ok {
 		response(w, false, "Usuario ya registrado", nil)
+		UserPubKeys[register.User] = register.PubKey
 		return
 	}
 
@@ -102,11 +103,11 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	u.Token = make([]byte, 16)
 	rand.Read(u.Token)
 
-	// logger.Info(util.Encode64(u.Token))
-
 	Users[u.Name] = u
 	UserNames = append(UserNames, u.Name)
-	response(w, true, "Usuario registrado", u.Token)
+	UserPubKeys[u.Name] = register.PubKey
+	msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	response(w, true, string(msg), u.Token)
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
