@@ -42,7 +42,7 @@ func main() {
 		case "q":
 			os.Exit(0)
 		default:
-			fmt.Print("Accion invalida, vuelva a intentarlo.\n")
+			fmt.Print("Accion invalida, vuelva a intentarlo.\n\n")
 			continue
 		}
 	}
@@ -83,7 +83,11 @@ func registerCmdLine(client *http.Client) models.Resp {
 	}
 
 	r := util.DecodeJSON[models.Resp](resp.Body)
-	util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+	if r.Ok == false {
+		fmt.Print("El usuario ya existe.\n\n")
+	} else {
+		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+	}
 
 	// fmt.Println(mensaje)
 
