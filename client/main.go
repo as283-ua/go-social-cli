@@ -21,22 +21,36 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	for {
-		resp := registerCmdLine(client)
-		if !resp.Ok {
-			fmt.Println(resp.Msg)
-			continue
-		}
+		fmt.Print("Acciones disponibles:\n\t1: Register\n\t2: Login\n\tq: Quit\nSeleccione la accion a realizar:")
+		accion, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		util.FailOnError(err)
 
-		resp = loginCmdLine(client)
-		if !resp.Ok {
-			fmt.Println(resp.Msg)
+		accion = strings.TrimSpace(accion)
+
+		switch accion {
+		case "1":
+			resp := registerCmdLine(client)
+			if !resp.Ok {
+				fmt.Println(resp.Msg)
+				continue
+			}
+		case "2":
+			resp := loginCmdLine(client)
+			if !resp.Ok {
+				fmt.Println(resp.Msg)
+			}
+		case "q":
+			os.Exit(0)
+		default:
+			fmt.Print("Accion invalida, vuelva a intentarlo.\n")
+			continue
 		}
 	}
 }
 
 func registerCmdLine(client *http.Client) models.Resp {
 
-	fmt.Print("Register\n\tUsuario: ")
+	fmt.Print("\nRegister\n\tUsuario: ")
 	username, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	util.FailOnError(err)
 
