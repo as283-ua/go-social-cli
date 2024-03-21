@@ -39,6 +39,7 @@ func main() {
 	http.HandleFunc("/register", registerHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/users", usersHandler)
+	http.HandleFunc("/posts", postsHandler)
 
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
 	util.FailOnError(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
@@ -135,6 +136,35 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		Users[u.Name] = u
 		response(w, true, "Credenciales válidas", u.Token)
 	}
+}
+
+func postsHandler(w http.ResponseWriter, req *http.Request) {
+	post := util.DecodeJSON[models.Post](req.Body)
+	req.Body.Close()
+	logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
+
+	validarToken(req.Header.Get("UserName"), req.Header.Get("Authorization"))
+
+	posts, ok := UserPosts[req.Header.Get("UserName")]
+	if !ok {
+		nPosts := make([]models.Post, 0)
+		UserPosts[req.Header.Get("UserName")] = nPosts
+	}
+
+	posts = append(posts, post)
+	UserPosts[req.Header.Get("UserName")] = posts
+}
+
+func validarToken(user string, token string) bool {
+	u, ok := Users[user] // ¿existe ya el usuario?
+	if !ok {
+		return false
+	} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
+		return false
+	} else if !bytes.EqualFold(u.Token, util.Decode64(token)) {
+		return false
+	}
+	return true
 }
 
 func response(w io.Writer, ok bool, msg string, token []byte) {
