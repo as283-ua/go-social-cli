@@ -16,6 +16,8 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+var nextIdPosts = 0
+
 var UserNames = make([]string, 0)
 var Users = make(map[string]models.User)
 
@@ -143,9 +145,15 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 	case "POST":
 		post := util.DecodeJSON[models.Post](req.Body)
 		req.Body.Close()
+
+		post = makePost(post.Content, req.Header.Get("UserName"))
+
 		logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
 
-		validarToken(req.Header.Get("UserName"), req.Header.Get("Authorization"))
+		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+			response(w, false, "Usuario no autenticado", nil)
+			return
+		}
 
 		posts, ok := UserPosts[req.Header.Get("UserName")]
 		if !ok {
@@ -155,6 +163,8 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 
 		posts = append(posts, post)
 		UserPosts[req.Header.Get("UserName")] = posts
+		util.EncodeJSON(models.Resp{Ok: true, Msg: "Post creado", Token: nil})
+		response(w, true, "Post creado", nil)
 	case "GET":
 		r := UserPosts
 		err := json.NewEncoder(w).Encode(&r)
@@ -163,13 +173,18 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 
 }
 
+func makePost(content string, Author string) models.Post {
+	nextIdPosts++
+	return models.Post{Content: content, Author: Author, Date: time.Now(), Id: nextIdPosts}
+}
+
 func validarToken(user string, token string) bool {
 	u, ok := Users[user] // ¿existe ya el usuario?
 	if !ok {
 		return false
 	} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
 		return false
-	} else if !bytes.EqualFold(u.Token, util.Decode64(token)) {
+	} else if !bytes.EqualFold(u.Token, []byte(token)) {
 		return false
 	}
 	return true
