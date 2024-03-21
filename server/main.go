@@ -139,20 +139,28 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func postsHandler(w http.ResponseWriter, req *http.Request) {
-	post := util.DecodeJSON[models.Post](req.Body)
-	req.Body.Close()
-	logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
+	switch req.Method {
+	case "POST":
+		post := util.DecodeJSON[models.Post](req.Body)
+		req.Body.Close()
+		logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
 
-	validarToken(req.Header.Get("UserName"), req.Header.Get("Authorization"))
+		validarToken(req.Header.Get("UserName"), req.Header.Get("Authorization"))
 
-	posts, ok := UserPosts[req.Header.Get("UserName")]
-	if !ok {
-		nPosts := make([]models.Post, 0)
-		UserPosts[req.Header.Get("UserName")] = nPosts
+		posts, ok := UserPosts[req.Header.Get("UserName")]
+		if !ok {
+			nPosts := make([]models.Post, 0)
+			UserPosts[req.Header.Get("UserName")] = nPosts
+		}
+
+		posts = append(posts, post)
+		UserPosts[req.Header.Get("UserName")] = posts
+	case "GET":
+		r := UserPosts
+		err := json.NewEncoder(w).Encode(&r)
+		util.FailOnError(err)
 	}
 
-	posts = append(posts, post)
-	UserPosts[req.Header.Get("UserName")] = posts
 }
 
 func validarToken(user string, token string) bool {
