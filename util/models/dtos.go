@@ -16,3 +16,7 @@ type RegisterCredentials struct {
 	Pass   string
 	PubKey []byte
 }
+
+type PostContent struct {
+	Content string
+}

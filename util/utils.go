@@ -33,11 +33,9 @@ func FailOnError(e error) {
 	}
 }
 
-func DecodeJSON[T any](r io.Reader) T {
-	var v T
+func DecodeJSON[T any](r io.Reader, v *T) {
 	dec := json.NewDecoder(r)
-	FailOnError(dec.Decode(&v))
-	return v
+	FailOnError(dec.Decode(v))
 }
 
 func EncodeJSON[T any](v T) []byte {
@@ -235,7 +233,7 @@ func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) []byte {
 
 func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
 	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
-	fmt.Println("cosa,", string(out))
+	fmt.Println(string(out))
 	FailOnError(err)
 	return out
 }

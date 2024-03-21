@@ -17,6 +17,23 @@ import (
 var token []byte
 var UserName string
 
+var options = []string{
+	"1: Register",
+	"2: Login",
+	"3: Post",
+	"4: All posts",
+	"5: Create group",
+	"6: Log out",
+	"q: Quit",
+}
+
+func printOptions() {
+	fmt.Println("Acciones disponibles:")
+	for _, v := range options {
+		fmt.Println("\t", v)
+	}
+}
+
 func main() {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -24,7 +41,8 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	for {
-		fmt.Print("Acciones disponibles:\n\t1: Register\n\t2: Login\n\t3: Post\n\t4: Todos posts\n\tq: Quit\nSeleccione la accion a realizar:")
+		printOptions()
+		fmt.Print("Seleccione una accion: ")
 		accion, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		util.FailOnError(err)
 
@@ -45,7 +63,10 @@ func main() {
 		case "3":
 			postPost(client)
 		case "4":
+			getPosts(client)
 		case "5":
+			fmt.Println("No implementado")
+		case "6":
 			logOut()
 		case "q":
 			os.Exit(0)
@@ -90,7 +111,8 @@ func registerCmdLine(client *http.Client) models.Resp {
 		fmt.Println(err)
 	}
 
-	r := util.DecodeJSON[models.Resp](resp.Body)
+	var r = models.Resp{}
+	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
 		fmt.Print("El usuario ya existe.\n\n")
 	} else {
@@ -125,7 +147,8 @@ func loginCmdLine(client *http.Client) models.Resp {
 		fmt.Println(err)
 	}
 
-	r := util.DecodeJSON[models.Resp](resp.Body)
+	var r = models.Resp{}
+	util.DecodeJSON(resp.Body, &r)
 	defer resp.Body.Close()
 	r.Msg = string(util.Decode64(r.Msg))
 	fmt.Println(r)
@@ -148,8 +171,8 @@ func postPost(client *http.Client) models.Resp {
 
 	util.FailOnError(err)
 
-	register := models.Post{Content: strings.TrimRight(content, "\n")}
-	jsonBody := util.EncodeJSON(register)
+	post := models.PostContent{Content: strings.TrimRight(content, "\n")}
+	jsonBody := util.EncodeJSON(post)
 
 	req, err := http.NewRequest("POST", "https://localhost:10443/posts", bytes.NewReader(jsonBody))
 	util.FailOnError(err)
@@ -164,12 +187,37 @@ func postPost(client *http.Client) models.Resp {
 		return models.Resp{Ok: false, Msg: "Error en la peticion"}
 	}
 
-	r := util.DecodeJSON[models.Resp](resp.Body)
+	var r models.Resp
+	util.DecodeJSON(resp.Body, &r)
 	r.Msg = string(util.Decode64(r.Msg))
 	fmt.Println(r)
 
 	resp.Body.Close()
 	return r
+}
+
+func getPosts(client *http.Client) {
+	req, err := http.NewRequest("GET", "https://localhost:10443/posts", nil)
+	util.FailOnError(err)
+	req.Header.Add("content-type", "application/json")
+
+	// req.Header.Add("Authorization", util.Encode64(token))
+	// req.Header.Add("UserName", UserName)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var posts map[int]models.Post
+	util.DecodeJSON(resp.Body, &posts)
+
+	for _, v := range posts {
+		fmt.Println(v)
+	}
+
+	resp.Body.Close()
 }
 
 func logOut() {
