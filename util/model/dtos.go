@@ -1,4 +1,4 @@
-package models
+package model
 
 type Resp struct {
 	Ok    bool

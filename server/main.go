@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -11,22 +10,26 @@ import (
 	"server/repository"
 	"strconv"
 	"time"
+
 	"util"
-	"util/models"
+	"util/model"
 
 	"golang.org/x/crypto/argon2"
 )
 
 // BD Principal
-var Users = make(map[string]models.User)
-var Groups = make(map[string]models.Group)
-var Posts = make(map[int]models.Post)
+var Users = make(map[string]model.User)
+var Groups = make(map[string]model.Group)
+var Posts = make(map[int]model.Post)
 
+/*
+ * Se ha sustituido por campo PubKey en model.User
+ */
 // Se guardan las claves públicas de los usuarios para que puedan iniciar una conversación privada entre ellos
-var UserPubKeys = make(map[string]crypto.PublicKey)
+// var UserPubKeys = make(map[string]crypto.PublicKey)
 
 // PK = Post id. No tiene sentido tener una
-var PostComments = make(map[int][]models.Comments)
+var PostComments = make(map[int][]model.Comments)
 
 // Indexing
 // PK = User name
@@ -41,7 +44,7 @@ var UserNames = make([]string, 0)
 var logger = util.GetLogger()
 
 func main() {
-	Users = make(map[string]models.User)
+	Users = make(map[string]model.User)
 
 	http.HandleFunc("/register", registerHandler) // POST
 	http.HandleFunc("/login", loginHandler)       // POST
@@ -93,8 +96,8 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Method {
 	case "POST":
-		var register models.RegisterCredentials
-		util.DecodeJSON[models.RegisterCredentials](req.Body, &register)
+		var register model.RegisterCredentials
+		util.DecodeJSON[model.RegisterCredentials](req.Body, &register)
 		req.Body.Close()
 
 		// logger.Info(fmt.Sprintf("Registro: %v\n", register))
@@ -104,11 +107,10 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 		_, ok := Users[register.User]
 		if ok {
 			response(w, false, "Usuario ya registrado", nil)
-			UserPubKeys[register.User] = register.PubKey
 			return
 		}
 
-		u := models.User{}
+		u := model.User{}
 		u.Name = register.User
 		u.Salt = make([]byte, 16)
 		rand.Read(u.Salt)
@@ -120,9 +122,10 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 		u.Token = make([]byte, 16)
 		rand.Read(u.Token)
 
+		u.PubKey = register.PubKey
 		Users[u.Name] = u
 		UserNames = append(UserNames, u.Name)
-		UserPubKeys[u.Name] = register.PubKey
+
 		msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
 		response(w, true, string(msg), u.Token)
 	default:
@@ -135,8 +138,8 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 
 	switch req.Method {
 	case "POST":
-		var login models.Credentials
-		util.DecodeJSON[models.Credentials](req.Body, &login)
+		var login model.Credentials
+		util.DecodeJSON[model.Credentials](req.Body, &login)
 		req.Body.Close()
 
 		logger.Info(fmt.Sprintf("Login: %v\n", login))
@@ -175,7 +178,7 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		var post models.PostContent
+		var post model.PostContent
 		util.DecodeJSON(req.Body, &post)
 		req.Body.Close()
 
@@ -183,7 +186,7 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 
 		repository.CreatePost(&Posts, &UserPosts, &GroupPosts, post.Content, req.Header.Get("UserName"), "")
 
-		util.EncodeJSON(models.Resp{Ok: true, Msg: "Post creado", Token: nil})
+		util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
 		response(w, true, "Post creado", nil)
 	case "GET":
 		r := Posts
@@ -208,7 +211,7 @@ func validarToken(user string, token string) bool {
 }
 
 func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := models.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
+	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }
