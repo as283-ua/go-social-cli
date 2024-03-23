@@ -43,13 +43,23 @@ var UserNames = make([]string, 0)
 
 var logger = util.GetLogger()
 
+func Authorization(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+			response(w, false, "Usuario no autenticado", nil)
+			return
+		}
+		next.ServeHTTP(w, req)
+	})
+}
+
 func main() {
 	Users = make(map[string]model.User)
 
 	http.HandleFunc("POST /register", registerHandler)
 	http.HandleFunc("POST /login", loginHandler)
 	http.HandleFunc("GET /users", usersHandler)
-	http.HandleFunc("POST /posts", postsHandler)
+	http.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
 	http.HandleFunc("GET /posts", getPostsHandler)
 
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
@@ -90,43 +100,38 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 func registerHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	switch req.Method {
-	case "POST":
-		var register model.RegisterCredentials
-		util.DecodeJSON[model.RegisterCredentials](req.Body, &register)
-		req.Body.Close()
+	var register model.RegisterCredentials
+	util.DecodeJSON(req.Body, &register)
+	req.Body.Close()
 
-		// logger.Info(fmt.Sprintf("Registro: %v\n", register))
+	// logger.Info(fmt.Sprintf("Registro: %v\n", register))
 
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-		_, ok := Users[register.User]
-		if ok {
-			response(w, false, "Usuario ya registrado", nil)
-			return
-		}
-
-		u := model.User{}
-		u.Name = register.User
-		u.Salt = make([]byte, 16)
-		rand.Read(u.Salt)
-		password := register.Pass
-
-		u.Hash = argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
-
-		u.Seen = time.Now()
-		u.Token = make([]byte, 16)
-		rand.Read(u.Token)
-
-		u.PubKey = register.PubKey
-		Users[u.Name] = u
-		UserNames = append(UserNames, u.Name)
-
-		msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
-		response(w, true, string(msg), u.Token)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	_, ok := Users[register.User]
+	if ok {
+		response(w, false, "Usuario ya registrado", nil)
+		return
 	}
+
+	u := model.User{}
+	u.Name = register.User
+	u.Salt = make([]byte, 16)
+	rand.Read(u.Salt)
+	password := register.Pass
+
+	u.Hash = argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
+
+	u.Seen = time.Now()
+	u.Token = make([]byte, 16)
+	rand.Read(u.Token)
+
+	u.PubKey = register.PubKey
+	Users[u.Name] = u
+	UserNames = append(UserNames, u.Name)
+
+	msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	response(w, true, string(msg), u.Token)
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
@@ -159,11 +164,6 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 
 func postsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
-		response(w, false, "Usuario no autenticado", nil)
-		return
-	}
 
 	var post model.PostContent
 	util.DecodeJSON(req.Body, &post)
