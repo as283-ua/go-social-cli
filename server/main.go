@@ -46,10 +46,11 @@ var logger = util.GetLogger()
 func main() {
 	Users = make(map[string]model.User)
 
-	http.HandleFunc("/register", registerHandler) // POST
-	http.HandleFunc("/login", loginHandler)       // POST
-	http.HandleFunc("/users", usersHandler)       // GET
-	http.HandleFunc("/posts", postsHandler)       // POST, GET
+	http.HandleFunc("POST /register", registerHandler)
+	http.HandleFunc("POST /login", loginHandler)
+	http.HandleFunc("GET /users", usersHandler)
+	http.HandleFunc("POST /posts", postsHandler)
+	http.HandleFunc("GET /posts", getPostsHandler)
 
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
 	util.FailOnError(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
@@ -58,37 +59,32 @@ func main() {
 func usersHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	switch req.Method {
-	case "GET":
-		query := req.URL.Query()
-		pageStr := query.Get("page")
-		sizeStr := query.Get("size")
-		page := 0
-		size := len(UserNames)
+	query := req.URL.Query()
+	pageStr := query.Get("page")
+	sizeStr := query.Get("size")
+	page := 0
+	size := len(UserNames)
 
-		if pageStr != "" {
-			p, err := strconv.Atoi(pageStr)
-			util.FailOnError(err)
-			page = p
-		}
-		if sizeStr != "" {
-			s, err := strconv.Atoi(sizeStr)
-			util.FailOnError(err)
-			size = s
-		}
-
-		start := page * size
-		end := (page + 1) * size
-
-		if end >= len(UserNames) {
-			end = len(UserNames)
-		}
-
-		err := json.NewEncoder(w).Encode(UserNames[start:end])
+	if pageStr != "" {
+		p, err := strconv.Atoi(pageStr)
 		util.FailOnError(err)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		page = p
 	}
+	if sizeStr != "" {
+		s, err := strconv.Atoi(sizeStr)
+		util.FailOnError(err)
+		size = s
+	}
+
+	start := page * size
+	end := (page + 1) * size
+
+	if end >= len(UserNames) {
+		end = len(UserNames)
+	}
+
+	err := json.NewEncoder(w).Encode(UserNames[start:end])
+	util.FailOnError(err)
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
@@ -136,65 +132,62 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 func loginHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	switch req.Method {
-	case "POST":
-		var login model.Credentials
-		util.DecodeJSON[model.Credentials](req.Body, &login)
-		req.Body.Close()
+	var login model.Credentials
+	util.DecodeJSON(req.Body, &login)
+	req.Body.Close()
 
-		logger.Info(fmt.Sprintf("Login: %v\n", login))
+	logger.Info(fmt.Sprintf("Login: %v\n", login))
 
-		w.Header().Set("Content-Type", "application/json")
+	u, ok := Users[login.User]
+	if !ok {
+		response(w, false, "Usuario inexistente", nil)
+		return
+	}
 
-		u, ok := Users[login.User]
-		if !ok {
-			response(w, false, "Usuario inexistente", nil)
-			return
-		}
-
-		password := login.Pass
-		hash := argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
-		if !bytes.Equal(u.Hash, hash) {
-			response(w, false, "Credenciales inválidas", nil)
-		} else {
-			u.Seen = time.Now()
-			u.Token = make([]byte, 16)
-			rand.Read(u.Token)
-			Users[u.Name] = u
-			response(w, true, "Credenciales válidas", u.Token)
-		}
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	password := login.Pass
+	hash := argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
+	if !bytes.Equal(u.Hash, hash) {
+		response(w, false, "Credenciales inválidas", nil)
+	} else {
+		u.Seen = time.Now()
+		u.Token = make([]byte, 16)
+		rand.Read(u.Token)
+		Users[u.Name] = u
+		response(w, true, "Credenciales válidas", u.Token)
 	}
 }
 
 func postsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	switch req.Method {
-	case "POST":
-		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
-			response(w, false, "Usuario no autenticado", nil)
-			return
-		}
-
-		var post model.PostContent
-		util.DecodeJSON(req.Body, &post)
-		req.Body.Close()
-
-		logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
-
-		repository.CreatePost(&Posts, &UserPosts, &GroupPosts, post.Content, req.Header.Get("UserName"), "")
-
-		util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
-		response(w, true, "Post creado", nil)
-	case "GET":
-		r := Posts
-		err := json.NewEncoder(w).Encode(&r)
-		util.FailOnError(err)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+		response(w, false, "Usuario no autenticado", nil)
+		return
 	}
+
+	var post model.PostContent
+	util.DecodeJSON(req.Body, &post)
+	req.Body.Close()
+
+	logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
+
+	repository.CreatePost(&Posts, &UserPosts, &GroupPosts, post.Content, req.Header.Get("UserName"), "")
+
+	util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
+	response(w, true, "Post creado", nil)
+}
+
+func getPostsHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+	// 	fmt.Println("Usuario no autenticado")
+	// 	response(w, false, "Usuario no autenticado", nil)
+	// 	return
+	// }
+
+	err := json.NewEncoder(w).Encode(&Posts)
+	util.FailOnError(err)
 }
 
 // utils server exclusive
