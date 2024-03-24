@@ -67,20 +67,25 @@ func Authorization(next http.Handler) http.Handler {
 }
 
 func main() {
-	Users = make(map[string]model.User)
+	server := http.Server{
+		Addr: ":10443",
+	}
 
-	http.HandleFunc("POST /register", registerHandler)
-	http.HandleFunc("POST /login", loginHandler)
-	http.HandleFunc("GET /users", usersHandler)
-	http.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
-	http.HandleFunc("GET /posts", getPostsHandler)
-	http.Handle("GET /chat/{user}", Authorization(http.HandlerFunc(chatHandler)))
-	http.Handle("GET /noauth/chat/{user}", http.HandlerFunc(chatHandler))
-	http.Handle("POST /chat/{user}/message", Authorization(http.HandlerFunc(sendMessageHandler)))
-	http.Handle("GET /chat/{user}/pk", Authorization(http.HandlerFunc(getPkHandler)))
+	router := http.NewServeMux()
 
+	router.HandleFunc("POST /register", registerHandler)
+	router.HandleFunc("POST /login", loginHandler)
+	router.HandleFunc("GET /users", usersHandler)
+	router.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
+	router.HandleFunc("GET /posts", getPostsHandler)
+	router.Handle("GET /chat/{user}", Authorization(http.HandlerFunc(chatHandler)))
+	router.Handle("GET /noauth/chat/{user}", http.HandlerFunc(chatHandler))
+	router.Handle("POST /chat/{user}/message", Authorization(http.HandlerFunc(sendMessageHandler)))
+	router.Handle("GET /chat/{user}/pk", Authorization(http.HandlerFunc(getPkHandler)))
+
+	server.Handler = router
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
-	util.FailOnError(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
+	util.FailOnError(server.ListenAndServeTLS("localhost.crt", "localhost.key"))
 }
 
 func usersHandler(w http.ResponseWriter, req *http.Request) {

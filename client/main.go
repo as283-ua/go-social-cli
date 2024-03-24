@@ -89,6 +89,7 @@ func registerCmdLine(client *http.Client) error {
 	fmt.Print("\nRegister\n\tUsuario: ")
 	username, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	util.FailOnError(err)
+	username = strings.TrimSpace(username)
 
 	fmt.Print("\tPassword: ")
 	password, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -110,7 +111,7 @@ func registerCmdLine(client *http.Client) error {
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 
-	register := model.RegisterCredentials{User: strings.TrimSpace(username), Pass: strings.TrimRight(password, "\n"), PubKey: publicKeyBytes}
+	register := model.RegisterCredentials{User: strings.TrimSpace(username), Pass: strings.TrimSpace(password), PubKey: publicKeyBytes}
 	jsonBody := util.EncodeJSON(register)
 
 	resp, err := client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
