@@ -143,7 +143,7 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	rand.Read(u.Salt)
 	password := register.Pass
 
-	u.Hash = argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
+	u.Hash = argon2.Key([]byte(password), u.Salt, 3, 32*1024, 4, 32)
 
 	u.Seen = time.Now()
 	u.Token = make([]byte, 16)
@@ -173,7 +173,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	password := login.Pass
-	hash := argon2.Key([]byte(password), u.Salt, 16384, 8, 1, 32)
+	hash := argon2.Key([]byte(password), u.Salt, 3, 32*1024, 4, 32)
 	if !bytes.Equal(u.Hash, hash) {
 		response(w, false, "Credenciales inválidas", nil)
 	} else {
