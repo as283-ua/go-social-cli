@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -24,6 +25,7 @@ var options = []string{
 	"4: All posts",
 	"5: Create group",
 	"6: Log out",
+	"7: SSE Chat",
 	"q: Quit",
 }
 
@@ -69,6 +71,10 @@ func main() {
 			fmt.Println("No implementado")
 		case "6":
 			logOut()
+		case "7":
+			fmt.Print("Usuario con el que desea chatear: ")
+			user, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+			testSSE(client, strings.TrimSpace(user))
 		case "q":
 			os.Exit(0)
 		default:
@@ -217,6 +223,43 @@ func getPosts(client *http.Client) {
 	}
 
 	resp.Body.Close()
+}
+
+func testSSE(client *http.Client, user string) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://localhost:10443/chat/%s", user), nil)
+	util.FailOnError(err)
+
+	req.Header.Set("Accept", "text/event-stream")
+
+	req.Header.Add("Authorization", util.Encode64(token))
+	req.Header.Add("UserName", UserName)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer resp.Body.Close()
+
+	reader := bufio.NewReader(resp.Body)
+
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			util.FailOnError(err)
+		}
+
+		if len(line) > 0 {
+			fmt.Printf("Received: %s", line) // Remove "data: "
+		}
+		// serv debe enviar acabado en \n\n
+		reader.ReadBytes('\n')
+	}
 }
 
 func logOut() {

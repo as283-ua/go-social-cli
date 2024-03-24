@@ -17,10 +17,23 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+type UserTuple struct {
+	First  string
+	Second string
+}
+
+func NewTupleAlphabeticOrder(a, b string) UserTuple {
+	if a <= b {
+		return UserTuple{a, b}
+	}
+	return UserTuple{b, a}
+}
+
 // BD Principal
 var Users = make(map[string]model.User)
 var Groups = make(map[string]model.Group)
 var Posts = make(map[int]model.Post)
+var Chats = make(map[UserTuple][]model.Message)
 
 /*
  * Se ha sustituido por campo PubKey en model.User
@@ -28,7 +41,7 @@ var Posts = make(map[int]model.Post)
 // Se guardan las claves públicas de los usuarios para que puedan iniciar una conversación privada entre ellos
 // var UserPubKeys = make(map[string]crypto.PublicKey)
 
-// PK = Post id. No tiene sentido tener una
+// PK = Post id. No tiene sentido tener una tabla de solo comentarios.
 var PostComments = make(map[int][]model.Comments)
 
 // Indexing
@@ -46,7 +59,7 @@ var logger = util.GetLogger()
 func Authorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
-			response(w, false, "Usuario no autenticado", nil)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, req)
@@ -61,6 +74,10 @@ func main() {
 	http.HandleFunc("GET /users", usersHandler)
 	http.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
 	http.HandleFunc("GET /posts", getPostsHandler)
+	http.Handle("GET /chat/{user}", Authorization(http.HandlerFunc(chatHandler)))
+	http.Handle("GET /noauth/chat/{user}", http.HandlerFunc(chatHandler))
+	http.Handle("POST /chat/{user}/message", Authorization(http.HandlerFunc(sendMessageHandler)))
+	http.Handle("GET /chat/{user}/pk", Authorization(http.HandlerFunc(getPkHandler)))
 
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
 	util.FailOnError(http.ListenAndServeTLS(":10443", "localhost.crt", "localhost.key", nil))
@@ -98,6 +115,7 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
+	logger.Info("Register handler")
 	w.Header().Set("Content-Type", "application/json")
 
 	var register model.RegisterCredentials
@@ -180,17 +198,65 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
-	// 	fmt.Println("Usuario no autenticado")
-	// 	response(w, false, "Usuario no autenticado", nil)
-	// 	return
-	// }
-
 	err := json.NewEncoder(w).Encode(&Posts)
 	util.FailOnError(err)
 }
 
-// utils server exclusive
+func chatHandler(w http.ResponseWriter, req *http.Request) {
+	logger.Info("Chat handler")
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	username := req.Header.Get("UserName")
+	otherUser := req.PathValue("user")
+
+	if _, ok := Users[otherUser]; !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	_, ok := Chats[NewTupleAlphabeticOrder(username, otherUser)]
+	if !ok {
+		Chats[NewTupleAlphabeticOrder(username, otherUser)] = make([]model.Message, 0)
+	}
+
+	// test
+	for i := 0; i < 10; i++ {
+		msg := fmt.Sprintf("Event %d", i)
+		logger.Info(fmt.Sprintf("Sending: %s", msg))
+		fmt.Fprintf(w, "data: %s\n\n", msg)
+		time.Sleep(1 * time.Second)
+		w.(http.Flusher).Flush()
+	}
+
+	// <-req.Context().Done()
+	// fmt.Println("Connection closed")
+}
+
+func sendMessageHandler(w http.ResponseWriter, req *http.Request) {
+	logger.Info("Message handler")
+	w.WriteHeader(http.StatusOK)
+}
+
+func getPkHandler(w http.ResponseWriter, req *http.Request) {
+	logger.Info("PK handler")
+	w.Header().Set("Content-Type", "application/json")
+
+	otherUser := req.PathValue("user")
+
+	u, ok := Users[otherUser]
+	if !ok {
+		response(w, false, "Usuario no encontrado", nil)
+		return
+	}
+
+	err := json.NewEncoder(w).Encode(u.PubKey)
+	util.FailOnError(err)
+}
+
 func validarToken(user string, token string) bool {
 	u, ok := Users[user] // ¿existe ya el usuario?
 	if !ok {

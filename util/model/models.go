@@ -35,3 +35,9 @@ type Comments struct {
 	Author  string
 	Date    time.Time
 }
+
+type Message struct {
+	From string
+	Data string
+	Read bool
+}
