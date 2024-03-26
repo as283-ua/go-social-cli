@@ -1,6 +1,8 @@
 package mvc
 
 import (
+	"net/http"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -8,9 +10,11 @@ import (
 type LoginPage struct {
 	username textinput.Model
 	password textinput.Model
+
+	client *http.Client
 }
 
-func InitialLoginModel() LoginPage {
+func InitialLoginModel(client *http.Client) LoginPage {
 	model := LoginPage{}
 
 	model.username = textinput.New()
@@ -19,6 +23,8 @@ func InitialLoginModel() LoginPage {
 
 	model.password = textinput.New()
 	model.password.Placeholder = "Password"
+
+	model.client = client
 
 	return model
 }
@@ -47,12 +53,12 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "left":
-			return InitialHomeModel(false), nil
+			return InitialHomeModel(false, nil, m.client), nil
 		case "enter":
 			// peticion a servidor
 			success := true
 			if success {
-				return InitialHomeModel(true), nil
+				return InitialHomeModel(true, nil, m.client), nil
 			}
 		}
 	}
