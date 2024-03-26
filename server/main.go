@@ -17,23 +17,23 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-type UserTuple struct {
+type UserChat struct {
 	First  string
 	Second string
 }
 
-func NewTupleAlphabeticOrder(a, b string) UserTuple {
+func NewTupleAlphabeticOrder(a, b string) UserChat {
 	if a <= b {
-		return UserTuple{a, b}
+		return UserChat{a, b}
 	}
-	return UserTuple{b, a}
+	return UserChat{b, a}
 }
 
 // BD Principal
 var Users = make(map[string]model.User)
 var Groups = make(map[string]model.Group)
 var Posts = make(map[int]model.Post)
-var Chats = make(map[UserTuple][]model.Message)
+var Chats = make(map[UserChat][]model.Message)
 
 /*
  * Se ha sustituido por campo PubKey en model.User
@@ -41,8 +41,8 @@ var Chats = make(map[UserTuple][]model.Message)
 // Se guardan las claves públicas de los usuarios para que puedan iniciar una conversación privada entre ellos
 // var UserPubKeys = make(map[string]crypto.PublicKey)
 
-// PK = Post id. No tiene sentido tener una tabla de solo comentarios.
-var PostComments = make(map[int][]model.Comments)
+// // PK = Post id. No tiene sentido tener una tabla de solo comentarios.
+// var PostComments = make(map[int][]model.Comments)
 
 // Indexing
 // PK = User name

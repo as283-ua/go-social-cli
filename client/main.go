@@ -24,8 +24,10 @@ var options = []string{
 	"3: Post",
 	"4: All posts",
 	"5: Create group",
-	"6: Log out",
-	"7: SSE Chat",
+	"6: Join group",
+	"7: Block User (admins only)",
+	"8: SSE Chat",
+	"9: Log out",
 	"q: Quit",
 }
 
@@ -64,17 +66,29 @@ func main() {
 				continue
 			}
 		case "3":
-			postPost(client)
+			fmt.Println("\t1: General Post\n\t2: Group Post")
+			option, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			util.FailOnError(err)
+			switch option {
+			case "1":
+				postPost(client)
+			case "2":
+				//post in group
+			}
 		case "4":
 			getPosts(client)
 		case "5":
 			fmt.Println("No implementado")
 		case "6":
-			logOut()
+			fmt.Println("No implementado")
 		case "7":
+			fmt.Println("No implementado")
+		case "8":
 			fmt.Print("Usuario con el que desea chatear: ")
 			user, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 			testSSE(client, strings.TrimSpace(user))
+		case "9":
+			logOut()
 		case "q":
 			os.Exit(0)
 		default:
