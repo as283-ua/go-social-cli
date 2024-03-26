@@ -11,6 +11,11 @@ type User struct {
 	PubKey []byte
 }
 
+type UserChat struct {
+	First  string
+	Second string
+}
+
 type Group struct {
 	Name string
 }
@@ -25,14 +30,6 @@ type Post struct {
 	Content string
 	Author  string
 	Group   string
-	Date    time.Time
-}
-
-type Comments struct {
-	Id      int
-	Post    int
-	Content string
-	Author  string
 	Date    time.Time
 }
 

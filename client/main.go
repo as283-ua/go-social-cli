@@ -166,6 +166,9 @@ func loginCmdLine(client *http.Client) error {
 	password, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	util.FailOnError(err)
 
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+
 	register := model.Credentials{User: strings.TrimSpace(username), Pass: strings.TrimRight(password, "\n")}
 	jsonBody := util.EncodeJSON(register)
 

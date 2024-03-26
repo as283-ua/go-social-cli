@@ -1,58 +1,111 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"server/repository"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
-
 	"util"
 	"util/model"
 
 	"golang.org/x/crypto/argon2"
 )
 
-type UserChat struct {
-	First  string
-	Second string
+func NewTupleAlphabeticOrder(a, b string) model.UserChat {
+	if a <= b {
+		return model.UserChat{First: a, Second: b}
+	}
+	return model.UserChat{First: b, Second: a}
 }
 
-func NewTupleAlphabeticOrder(a, b string) UserChat {
-	if a <= b {
-		return UserChat{a, b}
-	}
-	return UserChat{b, a}
-}
+var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
 
 // BD Principal
-var Users = make(map[string]model.User)
-var Groups = make(map[string]model.Group)
-var Posts = make(map[int]model.Post)
-var Chats = make(map[UserChat][]model.Message)
+type Database struct {
+	Users      map[string]model.User
+	Groups     map[string]model.Group
+	Posts      map[int]model.Post
+	UserPosts  map[string][]int
+	GroupPosts map[string][]int
+	GroupUsers map[string][]string
+	UserGroups map[string][]string
+	UserNames  []string
+}
 
-/*
- * Se ha sustituido por campo PubKey en model.User
- */
-// Se guardan las claves públicas de los usuarios para que puedan iniciar una conversación privada entre ellos
-// var UserPubKeys = make(map[string]crypto.PublicKey)
+var data Database
 
-// // PK = Post id. No tiene sentido tener una tabla de solo comentarios.
-// var PostComments = make(map[int][]model.Comments)
+// este metodo guarda la info de la base de datos en un archivo json sin encriptar para que podamos ver el contenido
+func saveDatabaseJSON() {
+	jsonData := util.EncodeJSON(data)
 
-// Indexing
-// PK = User name
-var UserPosts = make(map[string][]int)
-var GroupPosts = make(map[string][]int)
-var GroupUsers = make(map[string][]string)
-var UserGroups = make(map[string][]string)
+	err := os.WriteFile("db.json", jsonData, 0644)
+	util.FailOnError(err)
 
-// extras
-var UserNames = make([]string, 0)
+	fmt.Println("Base de datos guardada en", "db.json")
+}
+
+func saveDatabase() {
+	jsonData := util.EncodeJSON(data)
+
+	encryptedData := util.Encrypt(jsonData, key)
+
+	err := os.WriteFile("db.enc", encryptedData, 0644)
+	util.FailOnError(err)
+
+	fmt.Println("Base de datos guardada en", "db.enc")
+}
+
+func loadDatabase() {
+	encryptedData, err := os.ReadFile("db.enc")
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("El archivo de la base de datos no existe.")
+			data = Database{
+				Users:      make(map[string]model.User),
+				Groups:     make(map[string]model.Group),
+				Posts:      make(map[int]model.Post),
+				UserPosts:  make(map[string][]int),
+				GroupPosts: make(map[string][]int),
+				GroupUsers: make(map[string][]string),
+				UserGroups: make(map[string][]string),
+				UserNames:  make([]string, 0),
+			}
+			return
+		}
+		util.FailOnError(err)
+	}
+
+	jsonData := util.Decrypt(encryptedData, key)
+
+	util.DecodeJSON(bytes.NewReader(jsonData), &data)
+	err = json.Unmarshal(jsonData, &data)
+	util.FailOnError(err)
+
+	fmt.Println("Base de datos cargada desde db.enc")
+}
+
+func setupInterruptHandler() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT)
+	go func() {
+		<-c
+		fmt.Println("Guardando la base de datos")
+		saveDatabase()
+		saveDatabaseJSON()
+		os.Exit(1)
+	}()
+}
 
 var logger = util.GetLogger()
 
@@ -67,6 +120,16 @@ func Authorization(next http.Handler) http.Handler {
 }
 
 func main() {
+
+	fmt.Printf("Introduce la clave para desencriptar la base de datos: ")
+	introducedKey, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	util.FailOnError(err)
+	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
+	key = hash[:]
+
+	loadDatabase()
+	setupInterruptHandler()
+
 	server := http.Server{
 		Addr: ":10443",
 	}
@@ -95,7 +158,7 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 	pageStr := query.Get("page")
 	sizeStr := query.Get("size")
 	page := 0
-	size := len(UserNames)
+	size := len(data.UserNames)
 
 	if pageStr != "" {
 		p, err := strconv.Atoi(pageStr)
@@ -111,11 +174,11 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 	start := page * size
 	end := (page + 1) * size
 
-	if end >= len(UserNames) {
-		end = len(UserNames)
+	if end >= len(data.UserNames) {
+		end = len(data.UserNames)
 	}
 
-	err := json.NewEncoder(w).Encode(UserNames[start:end])
+	err := json.NewEncoder(w).Encode(data.UserNames[start:end])
 	util.FailOnError(err)
 }
 
@@ -131,7 +194,7 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	_, ok := Users[register.User]
+	_, ok := data.Users[register.User]
 	if ok {
 		response(w, false, "Usuario ya registrado", nil)
 		return
@@ -150,8 +213,8 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	rand.Read(u.Token)
 
 	u.PubKey = register.PubKey
-	Users[u.Name] = u
-	UserNames = append(UserNames, u.Name)
+	data.Users[u.Name] = u
+	data.UserNames = append(data.UserNames, u.Name)
 
 	msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
 	response(w, true, string(msg), u.Token)
@@ -166,13 +229,14 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 
 	logger.Info(fmt.Sprintf("Login: %v\n", login))
 
-	u, ok := Users[login.User]
+	u, ok := data.Users[login.User]
 	if !ok {
 		response(w, false, "Usuario inexistente", nil)
 		return
 	}
 
 	password := login.Pass
+
 	hash := argon2.Key([]byte(password), u.Salt, 3, 32*1024, 4, 32)
 	if !bytes.Equal(u.Hash, hash) {
 		response(w, false, "Credenciales inválidas", nil)
@@ -180,7 +244,7 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		u.Seen = time.Now()
 		u.Token = make([]byte, 16)
 		rand.Read(u.Token)
-		Users[u.Name] = u
+		data.Users[u.Name] = u
 		response(w, true, "Credenciales válidas", u.Token)
 	}
 }
@@ -194,7 +258,7 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 
 	logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
 
-	repository.CreatePost(&Posts, &UserPosts, &GroupPosts, post.Content, req.Header.Get("UserName"), "")
+	repository.CreatePost(&data.Posts, &data.UserPosts, &data.GroupPosts, post.Content, req.Header.Get("UserName"), "")
 
 	util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
 	response(w, true, "Post creado", nil)
@@ -203,7 +267,7 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	err := json.NewEncoder(w).Encode(&Posts)
+	err := json.NewEncoder(w).Encode(&data.Posts)
 	util.FailOnError(err)
 }
 
@@ -215,18 +279,18 @@ func chatHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	username := req.Header.Get("UserName")
+	//username := req.Header.Get("UserName")
 	otherUser := req.PathValue("user")
 
-	if _, ok := Users[otherUser]; !ok {
+	if _, ok := data.Users[otherUser]; !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	_, ok := Chats[NewTupleAlphabeticOrder(username, otherUser)]
-	if !ok {
-		Chats[NewTupleAlphabeticOrder(username, otherUser)] = make([]model.Message, 0)
-	}
+	// _, ok := data.Chats[NewTupleAlphabeticOrder(username, otherUser)]
+	// if !ok {
+	// 	data.Chats[NewTupleAlphabeticOrder(username, otherUser)] = make([]model.Message, 0)
+	// }
 
 	// test
 	for i := 0; i < 10; i++ {
@@ -252,7 +316,7 @@ func getPkHandler(w http.ResponseWriter, req *http.Request) {
 
 	otherUser := req.PathValue("user")
 
-	u, ok := Users[otherUser]
+	u, ok := data.Users[otherUser]
 	if !ok {
 		response(w, false, "Usuario no encontrado", nil)
 		return
@@ -263,7 +327,7 @@ func getPkHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func validarToken(user string, token string) bool {
-	u, ok := Users[user] // ¿existe ya el usuario?
+	u, ok := data.Users[user] // ¿existe ya el usuario?
 	if !ok {
 		return false
 	} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
