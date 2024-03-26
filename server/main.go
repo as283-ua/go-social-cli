@@ -103,6 +103,15 @@ func loadDatabase() error {
 	return nil
 }
 
+func saveState(intervalo int) {
+	ticker := time.NewTicker(time.Duration(intervalo) * time.Second)
+	for {
+		saveDatabase()
+		saveDatabaseJSON()
+		<-ticker.C
+	}
+}
+
 func setupInterruptHandler() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGINT)
@@ -141,6 +150,17 @@ func main() {
 		os.Exit(1)
 	}
 	setupInterruptHandler()
+
+	intervalo := 30 //intervalo por defecto = 30 segundos
+	if len(os.Args) == 2 {
+		intervaloStr := os.Args[1]
+		intervalo, err = strconv.Atoi(intervaloStr)
+		util.FailOnError(err)
+	}
+
+	fmt.Print(intervalo)
+
+	go saveState(intervalo) //multiplico por 1000 para que sean segundos
 
 	server := http.Server{
 		Addr: ":10443",
