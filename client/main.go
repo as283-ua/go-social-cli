@@ -26,8 +26,10 @@ var options = []string{
 	"3: Post",
 	"4: All posts",
 	"5: Create group",
-	"6: Log out",
-	"7: SSE Chat",
+	"6: Join group",
+	"7: Block User (admins only)",
+	"8: SSE Chat",
+	"9: Log out",
 	"q: Quit",
 }
 
