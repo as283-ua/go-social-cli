@@ -182,24 +182,32 @@ func ReadECDSAKeyFromFile(filename string) *ecdsa.PrivateKey {
 	return privKey
 }
 
-func ReadRSAKeyFromFile(filename string) *rsa.PrivateKey {
+func ReadRSAKeyFromFile(filename string) (*rsa.PrivateKey, error) {
 	privFile, err := os.Open("keys/" + filename)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 	defer privFile.Close()
 
 	info, err := privFile.Stat()
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	size := info.Size()
 	privBytes := make([]byte, size)
 	_, err = privFile.Read(privBytes)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	privPem, _ := pem.Decode(privBytes)
 	privKey, err := x509.ParsePKCS8PrivateKey(privPem.Bytes)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	return privKey.(*rsa.PrivateKey)
+	return privKey.(*rsa.PrivateKey), nil
 }
 
 func ReadPublicKeyBytesFromFile(filename string) []byte {

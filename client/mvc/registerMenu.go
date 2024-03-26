@@ -107,7 +107,10 @@ func (m RegisterPage) Register() ([]byte, error) {
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
 	} else {
-		privateKey = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		if err != nil {
+			return nil, err
+		}
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 

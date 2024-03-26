@@ -43,6 +43,8 @@ type Database struct {
 	UserNames  []string
 }
 
+var pendingCertLogin = make(map[string][]byte)
+
 var data Database
 
 // este metodo guarda la info de la base de datos en un archivo json sin encriptar para que podamos ver el contenido
@@ -170,6 +172,7 @@ func main() {
 
 	router.HandleFunc("POST /register", registerHandler)
 	router.HandleFunc("POST /login", loginHandler)
+	router.HandleFunc("GET /login/cert", loginCertHandler)
 	router.HandleFunc("GET /users", usersHandler)
 	router.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
 	router.HandleFunc("GET /posts", getPostsHandler)
@@ -284,6 +287,26 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 		data.Users[u.Name] = u
 		response(w, true, "Credenciales válidas", u.Token)
 	}
+}
+
+func loginCertHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	username := req.URL.Query().Get("user")
+
+	_, ok := data.Users[username]
+
+	if ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	b := make([]byte, 32)
+	rand.Read(b)
+
+	pendingCertLogin[username] = b
+
+	w.Write([]byte(util.Encode64(b)))
 }
 
 func postsHandler(w http.ResponseWriter, req *http.Request) {

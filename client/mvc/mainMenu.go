@@ -25,6 +25,7 @@ func InitialHomeModel(loggedIn bool, token []byte, client *http.Client) HomePage
 		model.options = []string{
 			"Register",
 			"Login",
+			"Login with certificate",
 			"All posts",
 		}
 	} else {
@@ -70,8 +71,10 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 0:
 					return InitialRegisterModel(m.client), nil
 				case 1:
-					return InitialLoginModel(m.client), nil
+					return InitialLoginModel(m.client, false), nil
 				case 2:
+					return InitialLoginModel(m.client, true), nil
+				case 3:
 					// get all posts
 				}
 			} else {

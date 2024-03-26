@@ -18,9 +18,10 @@ type LoginPage struct {
 	msg      string
 
 	client *http.Client
+	cert   bool
 }
 
-func InitialLoginModel(client *http.Client) LoginPage {
+func InitialLoginModel(client *http.Client, cert bool) LoginPage {
 	model := LoginPage{}
 
 	model.username = textinput.New()
@@ -31,6 +32,7 @@ func InitialLoginModel(client *http.Client) LoginPage {
 	model.password.Placeholder = "Password"
 
 	model.client = client
+	model.cert = cert
 
 	return model
 }
@@ -51,15 +53,29 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "down":
-			m.password.Focus()
-			m.username.Blur()
+			if !m.cert {
+				m.password.Focus()
+				m.username.Blur()
+			}
 		case "up":
-			m.username.Focus()
-			m.password.Blur()
+			if !m.cert {
+				m.username.Focus()
+				m.password.Blur()
+			}
 		case "left":
 			return InitialHomeModel(false, nil, m.client), nil
 		case "enter":
-			token, err := m.Login()
+			var (
+				token []byte
+				err   error
+			)
+
+			if !m.cert {
+				token, err = m.Login()
+			} else {
+				token, err = m.LoginCert()
+			}
+
 			if err != nil {
 				m.msg = err.Error()
 				return m, nil
@@ -77,7 +93,11 @@ func (m LoginPage) View() string {
 	s = "Login\n\n"
 
 	s += m.username.View() + "\n"
-	s += m.password.View() + "\n\n"
+	if !m.cert {
+		s += m.password.View() + "\n"
+	}
+
+	s += "\n"
 
 	if m.msg != "" {
 		s += "Info: " + m.msg + "\n\n"
@@ -110,4 +130,14 @@ func (m LoginPage) Login() ([]byte, error) {
 	token := r.Token
 
 	return token, nil
+}
+
+func (m LoginPage) LoginCert() ([]byte, error) {
+	privateKey, err := util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", m.username.Value()))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
