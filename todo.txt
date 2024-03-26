@@ -1,8 +1,3 @@
-almacenamiento seguro (aes en descanso) - alex
-back up (juntar con almacenamiento seguro) - alex
-pedir clave por terminal al arrancar, para evitar guardarlo en un archivo o en codigo
-
-
 chat (en progreso) - andres
 punto a punto (en chat, en progreso) - andres
 
