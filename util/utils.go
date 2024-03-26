@@ -33,9 +33,9 @@ func FailOnError(e error) {
 	}
 }
 
-func DecodeJSON[T any](r io.Reader, v *T) {
+func DecodeJSON[T any](r io.Reader, v *T) error {
 	dec := json.NewDecoder(r)
-	FailOnError(dec.Decode(v))
+	return dec.Decode(v)
 }
 
 func EncodeJSON[T any](v T) []byte {
@@ -57,10 +57,13 @@ func Encrypt(data, key []byte) (out []byte) {
 }
 
 // función para descifrar (AES-CTR 256)
-func Decrypt(data, key []byte) (out []byte) {
-	out = make([]byte, len(data)-16)     // la salida no va a tener el IV
-	blk, err := aes.NewCipher(key)       // cifrador en bloque (AES), usa key
-	FailOnError(err)                     // comprobamos el error
+func Decrypt(data, key []byte) (out []byte, err error) {
+	out = make([]byte, len(data)-16) // la salida no va a tener el IV
+	blk, err := aes.NewCipher(key)   // cifrador en bloque (AES), usa key
+	if err != nil {
+		return
+	}
+	// FailOnError(err)                     // comprobamos el error
 	ctr := cipher.NewCTR(blk, data[:16]) // cifrador en flujo: modo CTR, usa IV
 	ctr.XORKeyStream(out, data[16:])     // desciframos (doble cifrado) los datos
 	return
