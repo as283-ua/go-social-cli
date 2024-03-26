@@ -66,7 +66,7 @@ func saveDatabase() {
 	fmt.Println("Base de datos guardada en", "db.enc")
 }
 
-func loadDatabase() {
+func loadDatabase() error {
 	encryptedData, err := os.ReadFile("db.enc")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -81,18 +81,26 @@ func loadDatabase() {
 				UserGroups: make(map[string][]string),
 				UserNames:  make([]string, 0),
 			}
-			return
+			return nil
 		}
-		util.FailOnError(err)
+
+		return err
 	}
 
-	jsonData := util.Decrypt(encryptedData, key)
+	jsonData, err := util.Decrypt(encryptedData, key)
 
-	util.DecodeJSON(bytes.NewReader(jsonData), &data)
+	if err != nil {
+		return fmt.Errorf("clave incorrecta")
+	}
+
 	err = json.Unmarshal(jsonData, &data)
-	util.FailOnError(err)
+
+	if err != nil {
+		return fmt.Errorf("clave incorrecta")
+	}
 
 	fmt.Println("Base de datos cargada desde db.enc")
+	return nil
 }
 
 func setupInterruptHandler() {
@@ -127,7 +135,11 @@ func main() {
 	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
 	key = hash[:]
 
-	loadDatabase()
+	err = loadDatabase()
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 	setupInterruptHandler()
 
 	server := http.Server{
@@ -187,6 +199,11 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var register model.RegisterCredentials
+	if register.User == "" || register.Pass == "" || register.PubKey == nil {
+		response(w, false, "Campos vacíos", nil)
+		return
+	}
+
 	util.DecodeJSON(req.Body, &register)
 	req.Body.Close()
 

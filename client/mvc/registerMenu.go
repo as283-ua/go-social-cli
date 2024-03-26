@@ -93,7 +93,7 @@ func (m RegisterPage) Register() ([]byte, error) {
 	password := m.password.Value()
 
 	if username == "" || password == "" {
-		return nil, fmt.Errorf("Username and password must not be empty")
+		return nil, fmt.Errorf("username and password must not be empty")
 	}
 
 	var publicKeyBytes []byte
@@ -130,7 +130,7 @@ func (m RegisterPage) Register() ([]byte, error) {
 		token = r.Token
 	}
 
-	if token == nil {
+	if !r.Ok {
 		return nil, fmt.Errorf(r.Msg)
 	}
 
