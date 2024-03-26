@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 )
 
 type RegisterPage struct {
@@ -80,8 +81,17 @@ func (m RegisterPage) View() string {
 	s += m.username.View() + "\n"
 	s += m.password.View() + "\n\n"
 
+	lines := 5
+
 	if m.msg != "" {
+		lines = 7
 		s += "Info: " + m.msg + "\n\n"
+	}
+
+	_, y, _ := term.GetSize(0)
+
+	for i := 0; i < y-lines; i++ {
+		s += "\n"
 	}
 
 	return s
@@ -127,9 +137,10 @@ func (m RegisterPage) Register() ([]byte, error) {
 	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
-		return nil, fmt.Errorf("%s, %s, %s", util.Decode64(r.Msg), username, password)
+		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	} else {
-		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+		msg, _ := util.Decode64(r.Msg)
+		util.DecryptWithRSA(msg, privateKey)
 		token = r.Token
 	}
 

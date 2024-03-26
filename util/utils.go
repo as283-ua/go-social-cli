@@ -6,6 +6,7 @@ package util
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -95,10 +96,8 @@ func Encode64(data []byte) string {
 }
 
 // función para decodificar de string a []bytes (Base64)
-func Decode64(s string) []byte {
-	b, err := base64.StdEncoding.DecodeString(s) // recupera el formato original
-	FailOnError(err)                             // comprobamos el error
-	return b                                     // devolvemos los datos originales
+func Decode64(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s) // recupera el formato original
 }
 
 // función para resumir (SHA256)
@@ -246,4 +245,14 @@ func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
 	// fmt.Println(string(out))
 	FailOnError(err)
 	return out
+}
+
+func SignRSA(data []byte, key *rsa.PrivateKey) ([]byte, error) {
+	hashed := sha256.Sum256(data)
+	return rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashed[:], nil)
+}
+
+func CheckSignatureRSA(data []byte, signature []byte, key *rsa.PublicKey) error {
+	hashed := sha256.Sum256(data)
+	return rsa.VerifyPSS(key, crypto.SHA256, hashed[:], signature, nil)
 }

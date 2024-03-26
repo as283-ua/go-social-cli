@@ -130,7 +130,14 @@ var logger = util.GetLogger()
 
 func Authorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+		token, err := util.Decode64(req.Header.Get("Authorization"))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			util.FailOnError(err)
+			return
+		}
+
+		if !validarToken(req.Header.Get("UserName"), string(token)) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -172,7 +179,8 @@ func main() {
 
 	router.HandleFunc("POST /register", registerHandler)
 	router.HandleFunc("POST /login", loginHandler)
-	router.HandleFunc("GET /login/cert", loginCertHandler)
+	router.HandleFunc("GET /login/cert", getLoginCertHandler)
+	router.HandleFunc("POST /login/cert", postLoginCertHandler)
 	router.HandleFunc("GET /users", usersHandler)
 	router.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
 	router.HandleFunc("GET /posts", getPostsHandler)
@@ -256,8 +264,8 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	data.Users[u.Name] = u
 	data.UserNames = append(data.UserNames, u.Name)
 
-	msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
-	response(w, true, string(msg), u.Token)
+	encryptedMsg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	response(w, true, util.Encode64(encryptedMsg), u.Token)
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
@@ -289,14 +297,17 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func loginCertHandler(w http.ResponseWriter, req *http.Request) {
+func getLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	username := req.URL.Query().Get("user")
 
+	logger.Info(fmt.Sprintf("Login por certificado GET, %s", username))
+
 	_, ok := data.Users[username]
 
-	if ok {
+	if !ok {
+		logger.Info(fmt.Sprintf("Usuario %s no encontrado", username))
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -305,8 +316,66 @@ func loginCertHandler(w http.ResponseWriter, req *http.Request) {
 	rand.Read(b)
 
 	pendingCertLogin[username] = b
+	fmt.Fprintf(w, "%s", b)
 
-	w.Write([]byte(util.Encode64(b)))
+	go func() {
+		// timeout de 5 segundos para que no se llene la memoria de solicitudes
+		timer := time.NewTimer(5 * time.Second)
+		<-timer.C
+
+		_, ok = pendingCertLogin[username]
+		if ok {
+			delete(pendingCertLogin, username)
+			logger.Info(fmt.Sprintf("Timeout login por certificado para usuario, %s", username))
+		}
+	}()
+}
+
+func postLoginCertHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	username := req.URL.Query().Get("user")
+
+	logger.Info(fmt.Sprintf("Login por certificado POST, %s", username))
+
+	user, ok := data.Users[username]
+
+	if !ok {
+		logger.Info(fmt.Sprintf("Usuario no encontrado, %s", username))
+		w.WriteHeader(http.StatusNotFound)
+		logger.Info(fmt.Sprintf("Usuario %s no encontrado", username))
+		return
+	}
+
+	realToken, ok := pendingCertLogin[username]
+	if !ok {
+		logger.Info("Token expirado")
+		w.WriteHeader(http.StatusBadRequest)
+		response(w, false, "Token expirado", nil)
+		return
+	}
+
+	signature := make([]byte, 256)
+	req.Body.Read(signature)
+
+	err := util.CheckSignatureRSA(realToken, signature, util.ParsePublicKey(user.PubKey))
+	// logger.Info(fmt.Sprintf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, len(realToken), len(signature), len(user.PubKey)))
+	// logger.Info(fmt.Sprintf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, realToken, signature, user.PubKey))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		logger.Info("Clave incorrecta")
+		response(w, false, "Clave incorrecta", nil)
+		return
+	}
+
+	delete(pendingCertLogin, username)
+
+	user.Token = make([]byte, 16)
+	rand.Read(user.Token)
+
+	data.Users[username] = user
+
+	response(w, true, "Autenticación exitosa", []byte(util.Encode64(user.Token)))
 }
 
 func postsHandler(w http.ResponseWriter, req *http.Request) {
@@ -399,7 +468,7 @@ func validarToken(user string, token string) bool {
 }
 
 func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
+	r := model.Resp{Ok: ok, Msg: msg, Token: token}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }
