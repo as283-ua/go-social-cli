@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"os/signal"
 	"server/repository"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"util"
@@ -26,6 +29,8 @@ func NewTupleAlphabeticOrder(a, b string) model.UserChat {
 	return model.UserChat{First: b, Second: a}
 }
 
+var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
+
 // BD Principal
 type Database struct {
 	Users      map[string]model.User
@@ -40,7 +45,8 @@ type Database struct {
 
 var data Database
 
-func saveDatabase() {
+// este metodo guarda la info de la base de datos en un archivo json sin encriptar para que podamos ver el contenido
+func saveDatabaseJSON() {
 	jsonData := util.EncodeJSON(data)
 
 	err := os.WriteFile("db.json", jsonData, 0644)
@@ -49,8 +55,19 @@ func saveDatabase() {
 	fmt.Println("Base de datos guardada en", "db.json")
 }
 
+func saveDatabase() {
+	jsonData := util.EncodeJSON(data)
+
+	encryptedData := util.Encrypt(jsonData, key)
+
+	err := os.WriteFile("db.enc", encryptedData, 0644)
+	util.FailOnError(err)
+
+	fmt.Println("Base de datos guardada en", "db.enc")
+}
+
 func loadDatabase() {
-	jsonData, err := os.ReadFile("db.json")
+	encryptedData, err := os.ReadFile("db.enc")
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("El archivo de la base de datos no existe.")
@@ -69,11 +86,13 @@ func loadDatabase() {
 		util.FailOnError(err)
 	}
 
+	jsonData := util.Decrypt(encryptedData, key)
+
 	util.DecodeJSON(bytes.NewReader(jsonData), &data)
 	err = json.Unmarshal(jsonData, &data)
 	util.FailOnError(err)
 
-	fmt.Println("Base de datos cargada desde db.json")
+	fmt.Println("Base de datos cargada desde db.enc")
 }
 
 func setupInterruptHandler() {
@@ -83,6 +102,7 @@ func setupInterruptHandler() {
 		<-c
 		fmt.Println("Guardando la base de datos")
 		saveDatabase()
+		saveDatabaseJSON()
 		os.Exit(1)
 	}()
 }
@@ -100,6 +120,12 @@ func Authorization(next http.Handler) http.Handler {
 }
 
 func main() {
+
+	fmt.Printf("Introduce la clave para desencriptar la base de datos: ")
+	introducedKey, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	util.FailOnError(err)
+	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
+	key = hash[:]
 
 	loadDatabase()
 	setupInterruptHandler()
