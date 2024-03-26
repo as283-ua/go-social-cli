@@ -1,6 +1,15 @@
 package mvc
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"fmt"
+	"net/http"
+	"os"
+	"util"
+	"util/model"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -8,9 +17,12 @@ import (
 type RegisterPage struct {
 	username textinput.Model
 	password textinput.Model
+	msg      string
+
+	client *http.Client
 }
 
-func InitialRegisterModel() RegisterPage {
+func InitialRegisterModel(client *http.Client) RegisterPage {
 	model := RegisterPage{}
 
 	model.username = textinput.New()
@@ -19,6 +31,8 @@ func InitialRegisterModel() RegisterPage {
 
 	model.password = textinput.New()
 	model.password.Placeholder = "Password"
+
+	model.client = client
 
 	return model
 }
@@ -44,14 +58,15 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "up":
 			m.username.Focus()
 			m.password.Blur()
-		case "q":
-			return m, tea.Quit
 		case "left":
-			return InitialHomeModel(false), nil
+			return InitialHomeModel(false, nil, m.client), nil
 		case "enter":
-			success := true
-			if success {
-				return InitialHomeModel(true), nil
+			token, err := m.Register()
+			if err == nil {
+				return InitialHomeModel(true, token, m.client), nil
+			} else {
+				// return InitialHomeModel(false, nil, m.client), nil
+				m.msg = err.Error()
 			}
 		}
 	}
@@ -64,9 +79,61 @@ func (m RegisterPage) View() string {
 	s = "Register\n\n"
 
 	s += m.username.View() + "\n"
-	s += m.password.View()
+	s += m.password.View() + "\n\n"
 
-	s += "\n\nPresione 'q' para salir\n\n"
+	if m.msg != "" {
+		s += "Info: " + m.msg + "\n\n"
+	}
 
 	return s
+}
+
+func (m RegisterPage) Register() ([]byte, error) {
+	username := m.username.Value()
+	password := m.password.Value()
+
+	if username == "" || password == "" {
+		return nil, fmt.Errorf("Username and password must not be empty")
+	}
+
+	var publicKeyBytes []byte
+	var privateKey *rsa.PrivateKey
+	if _, err := os.Stat(fmt.Sprintf("%s.key", username)); err != nil {
+		// no hay err -> el archivo no existe
+		pk, err := rsa.GenerateKey(rand.Reader, 2048)
+		privateKey = pk
+		util.FailOnError(err)
+
+		// writeECDSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
+		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
+		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
+	} else {
+		privateKey = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
+	}
+
+	register := model.RegisterCredentials{User: username, Pass: password, PubKey: publicKeyBytes}
+	jsonBody := util.EncodeJSON(register)
+
+	resp, err := m.client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
+
+	if err != nil {
+		return nil, err
+	}
+
+	var r = model.Resp{}
+	var token []byte
+	util.DecodeJSON(resp.Body, &r)
+	if !r.Ok {
+	} else {
+		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+		token = r.Token
+	}
+
+	if token == nil {
+		return nil, fmt.Errorf(r.Msg)
+	}
+
+	resp.Body.Close()
+	return token, nil
 }

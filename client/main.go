@@ -47,8 +47,14 @@ func main() {
 	cliChulo := flag.Bool("tea", false, "Use tea CLI")
 	flag.Parse()
 
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+
 	if *cliChulo {
-		p := tea.NewProgram(mvc.InitialHomeModel(false))
+		p := tea.NewProgram(mvc.InitialHomeModel(false, nil, client))
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %v", err)
 			os.Exit(1)
@@ -56,11 +62,6 @@ func main() {
 		return
 	}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
 	for {
 		printOptions()
 		fmt.Print("Seleccione una accion: ")

@@ -1,6 +1,8 @@
 package mvc
 
 import (
+	"net/http"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -10,9 +12,12 @@ type HomePage struct {
 	cursor      int
 	cursorStyle lipgloss.Style
 	loggedIn    bool
+
+	client    *http.Client
+	userToken []byte
 }
 
-func InitialHomeModel(loggedIn bool) HomePage {
+func InitialHomeModel(loggedIn bool, token []byte, client *http.Client) HomePage {
 	model := HomePage{}
 	model.loggedIn = loggedIn
 
@@ -32,6 +37,10 @@ func InitialHomeModel(loggedIn bool) HomePage {
 	}
 
 	model.cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000")).Background(lipgloss.Color("#FFF"))
+
+	model.client = client
+	model.userToken = token
+
 	return model
 }
 
@@ -59,14 +68,16 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.loggedIn {
 				switch m.cursor {
 				case 0:
-					return InitialRegisterModel(), nil
+					return InitialRegisterModel(m.client), nil
 				case 1:
-					return InitialLoginModel(), nil
+					return InitialLoginModel(m.client), nil
+				case 2:
+					// get all posts
 				}
 			} else {
 				switch m.cursor {
 				case 3:
-					return InitialHomeModel(false), nil
+					return InitialHomeModel(false, nil, m.client), nil
 				}
 			}
 		}
