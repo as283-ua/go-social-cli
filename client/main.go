@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"client/mvc"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +15,8 @@ import (
 	"strings"
 	"util"
 	"util/model"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var token []byte
@@ -40,9 +44,22 @@ func printOptions() {
 }
 
 func main() {
+	cliChulo := flag.Bool("tea", false, "Use tea CLI")
+	flag.Parse()
+
+	if *cliChulo {
+		p := tea.NewProgram(mvc.InitialHomeModel(false))
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
+
 	client := &http.Client{Transport: tr}
 	for {
 		printOptions()
@@ -66,29 +83,17 @@ func main() {
 				continue
 			}
 		case "3":
-			fmt.Println("\t1: General Post\n\t2: Group Post")
-			option, err := bufio.NewReader(os.Stdin).ReadString('\n')
-			util.FailOnError(err)
-			switch option {
-			case "1":
-				postPost(client)
-			case "2":
-				//post in group
-			}
+			postPost(client)
 		case "4":
 			getPosts(client)
 		case "5":
 			fmt.Println("No implementado")
 		case "6":
-			fmt.Println("No implementado")
+			logOut()
 		case "7":
-			fmt.Println("No implementado")
-		case "8":
 			fmt.Print("Usuario con el que desea chatear: ")
 			user, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 			testSSE(client, strings.TrimSpace(user))
-		case "9":
-			logOut()
 		case "q":
 			os.Exit(0)
 		default:
