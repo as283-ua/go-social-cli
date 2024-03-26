@@ -215,17 +215,17 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
 	logger.Info("Register handler")
 	w.Header().Set("Content-Type", "application/json")
 
 	var register model.RegisterCredentials
+
+	util.DecodeJSON(req.Body, &register)
 	if register.User == "" || register.Pass == "" || register.PubKey == nil {
 		response(w, false, "Campos vacíos", nil)
 		return
 	}
-
-	util.DecodeJSON(req.Body, &register)
-	req.Body.Close()
 
 	// logger.Info(fmt.Sprintf("Registro: %v\n", register))
 

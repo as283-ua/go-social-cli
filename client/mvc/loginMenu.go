@@ -1,7 +1,12 @@
 package mvc
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
+	"strings"
+	"util"
+	"util/model"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,6 +15,7 @@ import (
 type LoginPage struct {
 	username textinput.Model
 	password textinput.Model
+	msg      string
 
 	client *http.Client
 }
@@ -50,16 +56,16 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "up":
 			m.username.Focus()
 			m.password.Blur()
-		case "q":
-			return m, tea.Quit
 		case "left":
 			return InitialHomeModel(false, nil, m.client), nil
 		case "enter":
-			// peticion a servidor
-			success := true
-			if success {
-				return InitialHomeModel(true, nil, m.client), nil
+			token, err := m.Login()
+			if err != nil {
+				m.msg = err.Error()
+				return m, nil
 			}
+
+			return InitialHomeModel(true, token, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
@@ -71,9 +77,37 @@ func (m LoginPage) View() string {
 	s = "Login\n\n"
 
 	s += m.username.View() + "\n"
-	s += m.password.View()
+	s += m.password.View() + "\n\n"
 
-	s += "\n\nPresione 'q' para salir\n\n"
+	if m.msg != "" {
+		s += "Info: " + m.msg + "\n\n"
+	}
 
 	return s
+}
+
+func (m LoginPage) Login() ([]byte, error) {
+	username := m.username.Value()
+	password := m.password.Value()
+
+	register := model.Credentials{User: strings.TrimSpace(username), Pass: strings.TrimSpace(password)}
+	jsonBody := util.EncodeJSON(register)
+
+	resp, err := m.client.Post("https://localhost:10443/login", "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("error al hacer la peticion")
+	}
+
+	var r = model.Resp{}
+	util.DecodeJSON(resp.Body, &r)
+	defer resp.Body.Close()
+	r.Msg = string(util.Decode64(r.Msg))
+
+	if !r.Ok {
+		return nil, fmt.Errorf("credenciales invalidas")
+	}
+
+	token := r.Token
+
+	return token, nil
 }

@@ -62,21 +62,20 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return InitialHomeModel(false, nil, m.client), nil
 		case "enter":
 			token, err := m.Register()
-			if err == nil {
-				return InitialHomeModel(true, token, m.client), nil
-			} else {
-				// return InitialHomeModel(false, nil, m.client), nil
+			if err != nil {
 				m.msg = err.Error()
+				return m, nil
 			}
+
+			// token := []byte("token")
+			return InitialHomeModel(true, token, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
 }
 
 func (m RegisterPage) View() string {
-	var s string
-
-	s = "Register\n\n"
+	s := "Register\n\n"
 
 	s += m.username.View() + "\n"
 	s += m.password.View() + "\n\n"
@@ -118,20 +117,17 @@ func (m RegisterPage) Register() ([]byte, error) {
 	resp, err := m.client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error al hacer la peticion. Servidor caído")
 	}
 
 	var r = model.Resp{}
 	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
+		return nil, fmt.Errorf("%s, %s, %s", util.Decode64(r.Msg), username, password)
 	} else {
 		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
 		token = r.Token
-	}
-
-	if !r.Ok {
-		return nil, fmt.Errorf(r.Msg)
 	}
 
 	resp.Body.Close()
