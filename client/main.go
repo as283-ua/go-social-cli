@@ -6,6 +6,8 @@ import (
 	"client/mvc"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -41,58 +43,63 @@ func printOptions() {
 
 }
 
-// func main() {
-// 	tr := &http.Transport{
-// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-// 	}
-// 	client := &http.Client{Transport: tr}
-// 	for {
-// 		printOptions()
-// 		fmt.Print("Seleccione una accion: ")
-// 		accion, err := bufio.NewReader(os.Stdin).ReadString('\n')
-// 		util.FailOnError(err)
-
-// 		accion = strings.TrimSpace(accion)
-
-// 		switch accion {
-// 		case "1":
-// 			err := registerCmdLine(client)
-// 			if err != nil {
-// 				fmt.Println(err)
-// 				continue
-// 			}
-// 		case "2":
-// 			err := loginCmdLine(client)
-// 			if err != nil {
-// 				fmt.Println(err)
-// 				continue
-// 			}
-// 		case "3":
-// 			postPost(client)
-// 		case "4":
-// 			getPosts(client)
-// 		case "5":
-// 			fmt.Println("No implementado")
-// 		case "6":
-// 			logOut()
-// 		case "7":
-// 			fmt.Print("Usuario con el que desea chatear: ")
-// 			user, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-// 			testSSE(client, strings.TrimSpace(user))
-// 		case "q":
-// 			os.Exit(0)
-// 		default:
-// 			fmt.Print("Accion invalida, vuelva a intentarlo.\n\n")
-// 			continue
-// 		}
-// 	}
-// }
-
 func main() {
-	p := tea.NewProgram(mvc.InitialHomeModel())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v", err)
-		os.Exit(1)
+	cliChulo := flag.Bool("tea", false, "Use tea CLI")
+	flag.Parse()
+
+	if *cliChulo {
+		p := tea.NewProgram(mvc.InitialHomeModel(false))
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	for {
+		printOptions()
+		fmt.Print("Seleccione una accion: ")
+		accion, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		util.FailOnError(err)
+
+		accion = strings.TrimSpace(accion)
+
+		switch accion {
+		case "1":
+			err := registerCmdLine(client)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		case "2":
+			err := loginCmdLine(client)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		case "3":
+			postPost(client)
+		case "4":
+			getPosts(client)
+		case "5":
+			fmt.Println("No implementado")
+		case "6":
+			logOut()
+		case "7":
+			fmt.Print("Usuario con el que desea chatear: ")
+			user, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+			testSSE(client, strings.TrimSpace(user))
+		case "q":
+			os.Exit(0)
+		default:
+			fmt.Print("Accion invalida, vuelva a intentarlo.\n\n")
+			continue
+		}
 	}
 }
 

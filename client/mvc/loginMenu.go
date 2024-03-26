@@ -47,10 +47,13 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "left":
-			return InitialHomeModel(), nil
+			return InitialHomeModel(false), nil
 		case "enter":
 			// peticion a servidor
-			return m, nil
+			success := true
+			if success {
+				return InitialHomeModel(true), nil
+			}
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)

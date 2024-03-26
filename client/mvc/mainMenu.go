@@ -9,15 +9,28 @@ type HomePage struct {
 	options     []string
 	cursor      int
 	cursorStyle lipgloss.Style
+	loggedIn    bool
 }
 
-func InitialHomeModel() HomePage {
+func InitialHomeModel(loggedIn bool) HomePage {
 	model := HomePage{}
-	model.options = []string{
-		"Register",
-		"Login",
-		"All posts",
+	model.loggedIn = loggedIn
+
+	if !loggedIn {
+		model.options = []string{
+			"Register",
+			"Login",
+			"All posts",
+		}
+	} else {
+		model.options = []string{
+			"All posts",
+			"Post",
+			"Search user",
+			"Logout",
+		}
 	}
+
 	model.cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000")).Background(lipgloss.Color("#FFF"))
 	return model
 }
@@ -43,11 +56,18 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "enter", "right":
-			switch m.cursor {
-			case 0:
-				return InitialRegisterModel(), nil
-			case 1:
-				return InitialLoginModel(), nil
+			if !m.loggedIn {
+				switch m.cursor {
+				case 0:
+					return InitialRegisterModel(), nil
+				case 1:
+					return InitialLoginModel(), nil
+				}
+			} else {
+				switch m.cursor {
+				case 3:
+					return InitialHomeModel(false), nil
+				}
 			}
 		}
 	}
