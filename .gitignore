@@ -9,6 +9,7 @@
 *.dylib
 *.json
 *.enc
+*.log
 
 # Test binary, built with `go test -c`
 *.test

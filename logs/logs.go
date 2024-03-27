@@ -50,6 +50,8 @@ func logsHandler(w http.ResponseWriter, req *http.Request, file *os.File) {
 	err = writer.Flush()
 	util.FailOnError(err)
 
+	fmt.Println(log)
+
 	response(w, true, "Log creado", nil)
 }
 

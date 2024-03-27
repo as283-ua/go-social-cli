@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -158,8 +159,6 @@ func main() {
 		util.FailOnError(err)
 	}
 
-	fmt.Print(intervalo)
-
 	go saveState(intervalo) //multiplico por 1000 para que sean segundos
 
 	server := http.Server{
@@ -215,7 +214,6 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
-	logger.Info("Register handler")
 	w.Header().Set("Content-Type", "application/json")
 
 	var register model.RegisterCredentials
@@ -227,7 +225,9 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	util.DecodeJSON(req.Body, &register)
 	req.Body.Close()
 
-	// logger.Info(fmt.Sprintf("Registro: %v\n", register))
+	logMessage := fmt.Sprintf("Registro: %v\n", register)
+	logger.Info(logMessage)
+	sendLog(logMessage)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -264,7 +264,9 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 	util.DecodeJSON(req.Body, &login)
 	req.Body.Close()
 
-	logger.Info(fmt.Sprintf("Login: %v\n", login))
+	logMessage := fmt.Sprintf("Login: %v", login)
+	logger.Info(logMessage)
+	sendLog(logMessage)
 
 	u, ok := data.Users[login.User]
 	if !ok {
@@ -293,7 +295,9 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 	util.DecodeJSON(req.Body, &post)
 	req.Body.Close()
 
-	logger.Info(fmt.Sprintf("Creando el post: %v\n", post))
+	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
+	logger.Info(logMessage)
+	sendLog(logMessage)
 
 	repository.CreatePost(&data.Posts, &data.UserPosts, &data.GroupPosts, post.Content, req.Header.Get("UserName"), "")
 
@@ -379,4 +383,18 @@ func response(w io.Writer, ok bool, msg string, token []byte) {
 	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
+}
+
+func sendLog(action string) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
+	currentTime := time.Now().Format("2006/01/02 15:04:05")
+	logMessage := fmt.Sprintf("%s INFO %s", currentTime, action)
+
+	req, err := http.NewRequest("POST", "https://localhost:10444/logs", bytes.NewReader([]byte(logMessage)))
+	util.FailOnError(err)
+	client.Do(req)
 }
