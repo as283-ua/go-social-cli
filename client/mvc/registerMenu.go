@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 )
 
 type RegisterPage struct {
@@ -59,30 +60,40 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.username.Focus()
 			m.password.Blur()
 		case "left":
-			return InitialHomeModel(false, nil, m.client), nil
+			return InitialHomeModel("", nil, m.client), nil
+		case "ctrl+c":
+			return m, tea.Quit
 		case "enter":
 			token, err := m.Register()
-			if err == nil {
-				return InitialHomeModel(true, token, m.client), nil
-			} else {
-				// return InitialHomeModel(false, nil, m.client), nil
+			if err != nil {
 				m.msg = err.Error()
+				return m, nil
 			}
+
+			// token := []byte("token")
+			return InitialHomeModel(m.username.Value(), token, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
 }
 
 func (m RegisterPage) View() string {
-	var s string
-
-	s = "Register\n\n"
+	s := "Register\n\n"
 
 	s += m.username.View() + "\n"
 	s += m.password.View() + "\n\n"
 
+	lines := 5
+
 	if m.msg != "" {
+		lines = 7
 		s += "Info: " + m.msg + "\n\n"
+	}
+
+	_, y, _ := term.GetSize(0)
+
+	for i := 0; i < y-lines; i++ {
+		s += "\n"
 	}
 
 	return s
@@ -108,7 +119,10 @@ func (m RegisterPage) Register() ([]byte, error) {
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
 	} else {
-		privateKey = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		if err != nil {
+			return nil, err
+		}
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 
@@ -118,20 +132,18 @@ func (m RegisterPage) Register() ([]byte, error) {
 	resp, err := m.client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error al hacer la peticion. Servidor caído")
 	}
 
 	var r = model.Resp{}
 	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
+		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	} else {
-		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+		msg, _ := util.Decode64(r.Msg)
+		util.DecryptWithRSA(msg, privateKey)
 		token = r.Token
-	}
-
-	if !r.Ok {
-		return nil, fmt.Errorf(r.Msg)
 	}
 
 	resp.Body.Close()

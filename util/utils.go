@@ -6,6 +6,7 @@ package util
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -16,7 +17,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -96,10 +96,8 @@ func Encode64(data []byte) string {
 }
 
 // función para decodificar de string a []bytes (Base64)
-func Decode64(s string) []byte {
-	b, err := base64.StdEncoding.DecodeString(s) // recupera el formato original
-	FailOnError(err)                             // comprobamos el error
-	return b                                     // devolvemos los datos originales
+func Decode64(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s) // recupera el formato original
 }
 
 // función para resumir (SHA256)
@@ -183,24 +181,32 @@ func ReadECDSAKeyFromFile(filename string) *ecdsa.PrivateKey {
 	return privKey
 }
 
-func ReadRSAKeyFromFile(filename string) *rsa.PrivateKey {
+func ReadRSAKeyFromFile(filename string) (*rsa.PrivateKey, error) {
 	privFile, err := os.Open("keys/" + filename)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 	defer privFile.Close()
 
 	info, err := privFile.Stat()
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	size := info.Size()
 	privBytes := make([]byte, size)
 	_, err = privFile.Read(privBytes)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	privPem, _ := pem.Decode(privBytes)
 	privKey, err := x509.ParsePKCS8PrivateKey(privPem.Bytes)
-	FailOnError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	return privKey.(*rsa.PrivateKey)
+	return privKey.(*rsa.PrivateKey), nil
 }
 
 func ReadPublicKeyBytesFromFile(filename string) []byte {
@@ -236,7 +242,16 @@ func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) []byte {
 
 func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
 	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
-	fmt.Println(string(out))
 	FailOnError(err)
 	return out
+}
+
+func SignRSA(data []byte, key *rsa.PrivateKey) ([]byte, error) {
+	hashed := sha256.Sum256(data)
+	return rsa.SignPSS(rand.Reader, key, crypto.SHA256, hashed[:], nil)
+}
+
+func CheckSignatureRSA(data []byte, signature []byte, key *rsa.PublicKey) error {
+	hashed := sha256.Sum256(data)
+	return rsa.VerifyPSS(key, crypto.SHA256, hashed[:], signature, nil)
 }

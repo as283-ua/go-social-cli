@@ -54,7 +54,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	if *cliChulo {
-		p := tea.NewProgram(mvc.InitialHomeModel(false, nil, client))
+		p := tea.NewProgram(mvc.InitialHomeModel("", nil, client))
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %v", err)
 			os.Exit(1)
@@ -127,7 +127,10 @@ func registerCmdLine(client *http.Client) error {
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
 	} else {
-		privateKey = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		if err != nil {
+			return err
+		}
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 
@@ -144,7 +147,8 @@ func registerCmdLine(client *http.Client) error {
 	if !r.Ok {
 		fmt.Print("El usuario ya existe.\n\n")
 	} else {
-		util.DecryptWithRSA(util.Decode64(r.Msg), privateKey)
+		msg, _ := util.Decode64(r.Msg)
+		fmt.Printf("%s\n", util.DecryptWithRSA(msg, privateKey))
 		token = r.Token
 		UserName = strings.TrimSpace(username)
 	}
@@ -180,7 +184,7 @@ func loginCmdLine(client *http.Client) error {
 	var r = model.Resp{}
 	util.DecodeJSON(resp.Body, &r)
 	defer resp.Body.Close()
-	r.Msg = string(util.Decode64(r.Msg))
+
 	fmt.Println(r)
 
 	if !r.Ok {
@@ -218,7 +222,8 @@ func postPost(client *http.Client) error {
 
 	var r model.Resp
 	util.DecodeJSON(resp.Body, &r)
-	r.Msg = string(util.Decode64(r.Msg))
+	msg, _ := util.Decode64(r.Msg)
+	r.Msg = string(msg)
 	fmt.Println(r)
 
 	resp.Body.Close()

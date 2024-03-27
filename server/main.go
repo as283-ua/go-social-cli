@@ -32,19 +32,9 @@ func NewTupleAlphabeticOrder(a, b string) model.UserChat {
 
 var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
 
-// BD Principal
-type Database struct {
-	Users      map[string]model.User
-	Groups     map[string]model.Group
-	Posts      map[int]model.Post
-	UserPosts  map[string][]int
-	GroupPosts map[string][]int
-	GroupUsers map[string][]string
-	UserGroups map[string][]string
-	UserNames  []string
-}
+var pendingCertLogin = make(map[string][]byte)
 
-var data Database
+var data model.Database
 
 // este metodo guarda la info de la base de datos en un archivo json sin encriptar para que podamos ver el contenido
 func saveDatabaseJSON() {
@@ -53,7 +43,7 @@ func saveDatabaseJSON() {
 	err := os.WriteFile("db.json", jsonData, 0644)
 	util.FailOnError(err)
 
-	fmt.Println("Base de datos guardada en", "db.json")
+	// fmt.Println("Base de datos guardada en", "db.json")
 }
 
 func saveDatabase() {
@@ -64,7 +54,7 @@ func saveDatabase() {
 	err := os.WriteFile("db.enc", encryptedData, 0644)
 	util.FailOnError(err)
 
-	fmt.Println("Base de datos guardada en", "db.enc")
+	// fmt.Println("Base de datos guardada en", "db.enc")
 }
 
 func loadDatabase() error {
@@ -72,7 +62,7 @@ func loadDatabase() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("El archivo de la base de datos no existe.")
-			data = Database{
+			data = model.Database{
 				Users:      make(map[string]model.User),
 				Groups:     make(map[string]model.Group),
 				Posts:      make(map[int]model.Post),
@@ -129,7 +119,18 @@ var logger = util.GetLogger()
 
 func Authorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if !validarToken(req.Header.Get("UserName"), string(util.Decode64(req.Header.Get("Authorization")))) {
+		token, err := util.Decode64(req.Header.Get("Authorization"))
+
+		logger.Info(fmt.Sprintf("Token %v", token))
+		if err != nil {
+			logger.Info("error de login. No se ha podido decodificar el header 'Authorization'")
+			w.WriteHeader(http.StatusInternalServerError)
+			util.FailOnError(err)
+			return
+		}
+
+		if err := validarToken(req.Header.Get("Username"), token); err != nil {
+			logger.Info(fmt.Sprintf("error de login. %s", err.Error()))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -169,6 +170,8 @@ func main() {
 
 	router.HandleFunc("POST /register", registerHandler)
 	router.HandleFunc("POST /login", loginHandler)
+	router.HandleFunc("GET /login/cert", getLoginCertHandler)
+	router.HandleFunc("POST /login/cert", postLoginCertHandler)
 	router.HandleFunc("GET /users", usersHandler)
 	router.Handle("POST /posts", Authorization(http.HandlerFunc(postsHandler)))
 	router.HandleFunc("GET /posts", getPostsHandler)
@@ -182,8 +185,7 @@ func main() {
 	util.FailOnError(server.ListenAndServeTLS("localhost.crt", "localhost.key"))
 }
 
-func usersHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func getPaginationSizes(req *http.Request) (int, int, error) {
 
 	query := req.URL.Query()
 	pageStr := query.Get("page")
@@ -193,13 +195,31 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 
 	if pageStr != "" {
 		p, err := strconv.Atoi(pageStr)
-		util.FailOnError(err)
+		if err != nil {
+			return 0, 0, err
+		}
 		page = p
 	}
+
 	if sizeStr != "" {
 		s, err := strconv.Atoi(sizeStr)
-		util.FailOnError(err)
+		if err != nil {
+			return 0, 0, err
+		}
 		size = s
+	}
+
+	return page, size, nil
+}
+
+func usersHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	page, size, err := getPaginationSizes(req)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	start := page * size
@@ -209,21 +229,21 @@ func usersHandler(w http.ResponseWriter, req *http.Request) {
 		end = len(data.UserNames)
 	}
 
-	err := json.NewEncoder(w).Encode(data.UserNames[start:end])
+	err = json.NewEncoder(w).Encode(data.UserNames[start:end])
 	util.FailOnError(err)
 }
 
 func registerHandler(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
 	w.Header().Set("Content-Type", "application/json")
 
 	var register model.RegisterCredentials
+
+	util.DecodeJSON(req.Body, &register)
 	if register.User == "" || register.Pass == "" || register.PubKey == nil {
 		response(w, false, "Campos vacíos", nil)
 		return
 	}
-
-	util.DecodeJSON(req.Body, &register)
-	req.Body.Close()
 
 	logMessage := fmt.Sprintf("Registro: %v\n", register)
 	logger.Info(logMessage)
@@ -253,8 +273,8 @@ func registerHandler(w http.ResponseWriter, req *http.Request) {
 	data.Users[u.Name] = u
 	data.UserNames = append(data.UserNames, u.Name)
 
-	msg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
-	response(w, true, string(msg), u.Token)
+	encryptedMsg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	response(w, true, util.Encode64(encryptedMsg), u.Token)
 }
 
 func loginHandler(w http.ResponseWriter, req *http.Request) {
@@ -288,18 +308,100 @@ func loginHandler(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func getLoginCertHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	username := req.URL.Query().Get("user")
+
+	logger.Info(fmt.Sprintf("Login por certificado GET, %s", username))
+
+	_, ok := data.Users[username]
+
+	if !ok {
+		logger.Info(fmt.Sprintf("Usuario %s no encontrado", username))
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	b := make([]byte, 32)
+	rand.Read(b)
+
+	pendingCertLogin[username] = b
+	fmt.Fprintf(w, "%s", b)
+
+	go func() {
+		// timeout de 5 segundos para que no se llene la memoria de solicitudes
+		timer := time.NewTimer(5 * time.Second)
+		<-timer.C
+
+		_, ok = pendingCertLogin[username]
+		if ok {
+			delete(pendingCertLogin, username)
+			logger.Info(fmt.Sprintf("Timeout login por certificado para usuario, %s", username))
+		}
+	}()
+}
+
+func postLoginCertHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	username := req.URL.Query().Get("user")
+
+	logger.Info(fmt.Sprintf("Login por certificado POST, %s", username))
+
+	user, ok := data.Users[username]
+
+	if !ok {
+		logger.Info(fmt.Sprintf("Usuario no encontrado, %s", username))
+		w.WriteHeader(http.StatusNotFound)
+		logger.Info(fmt.Sprintf("Usuario %s no encontrado", username))
+		return
+	}
+
+	realToken, ok := pendingCertLogin[username]
+	if !ok {
+		logger.Info("Token expirado")
+		w.WriteHeader(http.StatusBadRequest)
+		response(w, false, "Token expirado", nil)
+		return
+	}
+
+	signature := make([]byte, 256)
+	req.Body.Read(signature)
+
+	err := util.CheckSignatureRSA(realToken, signature, util.ParsePublicKey(user.PubKey))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		logger.Info("Clave incorrecta")
+		response(w, false, "Clave incorrecta", nil)
+		return
+	}
+
+	delete(pendingCertLogin, username)
+
+	user.Token = make([]byte, 16)
+	rand.Read(user.Token)
+	user.Seen = time.Now()
+	data.Users[username] = user
+
+	logger.Info(fmt.Sprintf("Último login del usuario '%s': %s", username, user.Seen.Format(time.RFC3339)))
+
+	response(w, true, "Autenticación exitosa", []byte(util.Encode64(user.Token)))
+}
+
 func postsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	var post model.PostContent
-	util.DecodeJSON(req.Body, &post)
+	logger.Info(fmt.Sprintf("Publicado post por %s", req.Header.Get("Username")))
+
+	var postContent model.PostContent
+	util.DecodeJSON(req.Body, &postContent)
 	req.Body.Close()
 
+	post := repository.CreatePost(&data, postContent.Content, req.Header.Get("Username"), "")
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
 	logger.Info(logMessage)
 	sendLog(logMessage)
-
-	repository.CreatePost(&data.Posts, &data.UserPosts, &data.GroupPosts, post.Content, req.Header.Get("UserName"), "")
 
 	util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
 	response(w, true, "Post creado", nil)
@@ -308,8 +410,46 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	err := json.NewEncoder(w).Encode(&data.Posts)
-	util.FailOnError(err)
+	logger.Info(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
+
+	page, size, err := getPaginationSizes(req)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	start := page * size
+	end := (page + 1) * size
+	n := len(data.PostIds)
+	if end >= n {
+		end = n - 1
+	}
+
+	var postids []int
+	if n <= start {
+		postids = nil
+		end = 0
+		start = 0
+	} else {
+		if n < end {
+			end = n
+		}
+		postids = data.PostIds[start:end]
+	}
+
+	posts := make([]model.Post, end-start)
+	for i, id := range postids {
+		posts[i] = data.Posts[id]
+	}
+
+	logger.Info("Enviados posts")
+
+	err = json.NewEncoder(w).Encode(posts)
+	if err != nil {
+		logger.Error("Error enviando")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func chatHandler(w http.ResponseWriter, req *http.Request) {
@@ -320,7 +460,7 @@ func chatHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	//username := req.Header.Get("UserName")
+	//username := req.Header.Get\("Username")
 	otherUser := req.PathValue("user")
 
 	if _, ok := data.Users[otherUser]; !ok {
@@ -367,20 +507,29 @@ func getPkHandler(w http.ResponseWriter, req *http.Request) {
 	util.FailOnError(err)
 }
 
-func validarToken(user string, token string) bool {
+func validarToken(user string, token []byte) error {
+	if user == "" {
+		return fmt.Errorf("nombre de usuario no proporcionado")
+	}
+
+	if token == nil {
+		return fmt.Errorf("token no proporcionado")
+	}
+
 	u, ok := data.Users[user] // ¿existe ya el usuario?
 	if !ok {
-		return false
-	} else if (u.Token == nil) || (time.Since(u.Seen).Minutes() > 60) {
-		return false
-	} else if !bytes.EqualFold(u.Token, []byte(token)) {
-		return false
+		return fmt.Errorf("usuario no encontrado")
+	} else if time.Since(u.Seen).Minutes() > 60 {
+		return fmt.Errorf("token expirado")
+	} else if !bytes.EqualFold(u.Token, token) {
+		return fmt.Errorf(fmt.Sprintf("token incorrecto. Real: %v. Proporcionado: %v", u.Token, token))
 	}
-	return true
+
+	return nil
 }
 
 func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
+	r := model.Resp{Ok: ok, Msg: msg, Token: token}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }

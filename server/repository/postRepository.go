@@ -1,23 +1,31 @@
 package repository
 
 import (
+	"strings"
 	"time"
 	"util/model"
 )
 
 var nextIdPosts = 0
 
-func CreatePost(posts *map[int]model.Post, userPosts *map[string][]int, groupPosts *map[string][]int, content string, author string, group string) {
-	post := model.Post{Id: nextIdPosts, Content: content, Author: author, Group: group, Date: time.Now()}
+func CreatePost(db *model.Database, content string, author string, group string) model.Post {
+	post := model.Post{Id: nextIdPosts, Content: strings.TrimSpace(content), Author: author, Group: group, Date: time.Now()}
 
 	// Si post pertenece a grupo, solo sale en feed de grupo, si no, sale publicamente para todos
-	if post.Group != "" && groupPosts != nil {
-		(*groupPosts)[post.Group] = append((*groupPosts)[post.Group], post.Id)
+	if post.Group != "" {
+		if _, ok := (*db).GroupPosts[post.Group]; !ok {
+			(*db).GroupPosts[post.Group] = make([]int, 2)
+		}
+
+		(*db).GroupPosts[post.Group] = append((*db).GroupPosts[post.Group], post.Id)
 	} else {
-		(*posts)[post.Id] = post
+		(*db).Posts[post.Id] = post
+		(*db).PostIds = append((*db).PostIds, post.Id)
 	}
 
-	(*userPosts)[post.Author] = append((*userPosts)[post.Author], post.Id)
+	(*db).UserPosts[post.Author] = append((*db).UserPosts[post.Author], post.Id)
 
 	nextIdPosts++
+
+	return post
 }
