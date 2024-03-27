@@ -54,7 +54,7 @@ func main() {
 	client := &http.Client{Transport: tr}
 
 	if *cliChulo {
-		p := tea.NewProgram(mvc.InitialHomeModel(false, nil, client))
+		p := tea.NewProgram(mvc.InitialHomeModel("", nil, client))
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %v", err)
 			os.Exit(1)

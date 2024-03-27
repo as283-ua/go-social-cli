@@ -1,6 +1,7 @@
 package mvc
 
 import (
+	"fmt"
 	"net/http"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,36 +12,35 @@ type HomePage struct {
 	options     []string
 	cursor      int
 	cursorStyle lipgloss.Style
-	loggedIn    bool
+	username    string
 
-	client    *http.Client
-	userToken []byte
+	client *http.Client
+	token  []byte
 }
 
-func InitialHomeModel(loggedIn bool, token []byte, client *http.Client) HomePage {
+func InitialHomeModel(username string, token []byte, client *http.Client) HomePage {
 	model := HomePage{}
-	model.loggedIn = loggedIn
+	model.username = username
 
-	if !loggedIn {
+	model.client = client
+	model.token = token
+
+	if model.token == nil {
 		model.options = []string{
 			"Register",
 			"Login",
 			"Login with certificate",
-			"All posts",
+			"Posts",
 		}
 	} else {
 		model.options = []string{
-			"All posts",
-			"Post",
+			"Posts",
 			"Search user",
 			"Logout",
 		}
 	}
 
 	model.cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000")).Background(lipgloss.Color("#FFF"))
-
-	model.client = client
-	model.userToken = token
 
 	return model
 }
@@ -63,10 +63,10 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < 0 {
 				m.cursor = len(m.options) - 1
 			}
-		case "q":
+		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", "right":
-			if !m.loggedIn {
+			if m.token == nil {
 				switch m.cursor {
 				case 0:
 					return InitialRegisterModel(m.client), nil
@@ -75,12 +75,16 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 2:
 					return InitialLoginModel(m.client, true), nil
 				case 3:
-					// get all posts
+					cmd := GetPostsMsg(0, m.client)
+					return InitialPostListModel("", nil, m.client), cmd
 				}
 			} else {
 				switch m.cursor {
-				case 3:
-					return InitialHomeModel(false, nil, m.client), nil
+				case 0:
+					cmd := GetPostsMsg(0, m.client)
+					return InitialPostListModel(m.username, m.token, m.client), cmd
+				case 2:
+					return InitialHomeModel("", nil, m.client), nil
 				}
 			}
 		}
@@ -89,7 +93,11 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m HomePage) View() string {
-	s := "Opciones disponibles:\n"
+	var s string
+	if m.username != "" {
+		s = fmt.Sprintf("Hola, %s\n\n", m.username)
+	}
+	s += "Opciones disponibles:\n"
 
 	for i, option := range m.options {
 		if i == m.cursor {
@@ -99,7 +107,12 @@ func (m HomePage) View() string {
 		}
 	}
 
-	s += "\nPresione 'q' para salir\n\n"
+	s += "\nPresione 'q' o 'ctrl-c' para salir\n\n"
+
+	// y := 15
+	// for i := 0; i < y; i++ {
+	// 	s += "\n"
+	// }
 
 	return s
 }

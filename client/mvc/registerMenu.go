@@ -60,7 +60,9 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.username.Focus()
 			m.password.Blur()
 		case "left":
-			return InitialHomeModel(false, nil, m.client), nil
+			return InitialHomeModel("", nil, m.client), nil
+		case "ctrl+c":
+			return m, tea.Quit
 		case "enter":
 			token, err := m.Register()
 			if err != nil {
@@ -69,7 +71,7 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// token := []byte("token")
-			return InitialHomeModel(true, token, m.client), nil
+			return InitialHomeModel(m.username.Value(), token, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)

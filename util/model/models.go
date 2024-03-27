@@ -2,6 +2,19 @@ package model
 
 import "time"
 
+// BD Principal
+type Database struct {
+	Users      map[string]User
+	Groups     map[string]Group
+	Posts      map[int]Post
+	UserPosts  map[string][]int
+	GroupPosts map[string][]int
+	GroupUsers map[string][]string
+	UserGroups map[string][]string
+	UserNames  []string
+	PostIds    []int
+}
+
 type User struct {
 	Name   string
 	Salt   []byte
