@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"util"
@@ -27,17 +28,13 @@ type PostListModel struct {
 	username       string
 	token          []byte
 	pagesLoaded    int
-	itemsOffset    int
+	postsLoaded    map[int]bool
 	canRequestMore bool
 }
 
 /*
 Aclaracion sobre componentes del modelo:
-	- Item offset. Inicialmente solo tenemos 5 posts cargados (ids 4, 3, 2, 1, 0) y se muestran los que se pueden. Si llegas al final de la pagina
-	se hace una peticion al servidor para la siguiente pagina (pagina 1, size 5). Sin embargo, si se ha creado algun post, digamos 2 por ejemplo,
-	ahora en bd tenemos los posts 6, 5, 4, 3, 2, 1, 0, por lo que la pagina 1 ahora empezaría por el post 1, el cual ya esta cargado y no haria falta cargar de nuevo.
-	Con el offset, nos saltamos los x primeros posts que hemos subido nosotros, para que no se repitan.
-	Si tenemos los posts 44 43 42 41 40 ..., subimos el 45 y 46, en la siguiente carga nos saltamos el 41 y 40 y solo usamos los otros 3 posts no vistos antes
+	- PostsLoaded. Mapa de ids de posts que se han cargado para que al recibir una pagina, si hay posts que han hecho que se descuadre la paginacion, solo se añaden los nuevos
 
 	- Can request more. Para evitar que se envian muchas peticiones aposta al llegar al final de la pagina, se fija un timer de 5 segundos que impide hacer peticiones de carga
 */
@@ -54,6 +51,7 @@ func InitialPostListModel(username string, token []byte, client *http.Client) Po
 	m.username = username
 	m.token = token
 	m.canRequestMore = true
+	m.postsLoaded = make(map[int]bool)
 
 	m.viewport = viewport.New(80, 12)
 
@@ -137,24 +135,23 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return InitialHomeModel(m.username, m.token, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+r":
+			return InitialPostListModel(m.username, m.token, m.client), GetPostsMsg(0, m.client)
 		case "ctrl+s":
 			if m.token == nil {
 				m.msg = "No token. Can't post"
 				break
 			}
 
-			err := m.PublishPost()
+			postId, err := m.PublishPost()
 			if err != nil {
 				m.msg = err.Error()
 			} else {
 				m.msg = "Posted!"
 
 				m.viewport.GotoTop()
-				m.itemsOffset++
 
-				if m.itemsOffset >= 5 {
-					m.itemsOffset = 0
-				}
+				m.postsLoaded[postId] = true
 
 				newPost := make([]string, 1)
 				newPost[0] = InitialPost(model.Post{Content: m.textbox.Value(), Author: m.username}).View()
@@ -181,18 +178,15 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		postRender := InitialPost(model.Post{})
-		for i, post := range msg {
-			if i < m.itemsOffset {
+		for _, post := range msg {
+			if _, ok := m.postsLoaded[post.Id]; ok {
 				continue
 			}
+
+			m.postsLoaded[post.Id] = true
+
 			postRender.post = post
 			m.posts = append(m.posts, postRender.View())
-		}
-
-		m.itemsOffset -= 5
-
-		if m.itemsOffset < 0 {
-			m.itemsOffset = 0
 		}
 
 		m.msg = "Loaded posts"
@@ -220,16 +214,20 @@ func (m PostListModel) View() string {
 		s += m.textbox.View() + "\n"
 	}
 
+	if m.token != nil {
+		s += "ctrl+s to post\n"
+	}
+
+	s += "ctrl+r to refresh\n\n"
+
 	if m.msg != "" {
 		s += fmt.Sprintf("Info: %s\n\n", m.msg)
 	}
 
-	s += "ctrl+s to post\n\n"
-
 	return s
 }
 
-func (m PostListModel) PublishPost() error {
+func (m PostListModel) PublishPost() (int, error) {
 	post := model.Post{Content: m.textbox.Value()}
 	postBytes := util.EncodeJSON(post)
 	req, _ := http.NewRequest("POST", "https://127.0.0.1:10443/posts", bytes.NewReader(postBytes))
@@ -238,24 +236,24 @@ func (m PostListModel) PublishPost() error {
 	res, err := m.client.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("error conectando con el servidor")
+		return -1, fmt.Errorf("error conectando con el servidor")
 	}
 
 	switch res.StatusCode {
 	case http.StatusUnauthorized:
-		return fmt.Errorf("Login incorrecto")
+		return -1, fmt.Errorf("Login incorrecto")
 	}
 
 	resp := model.Resp{}
 	err = util.DecodeJSON(res.Body, &resp)
 
 	if err != nil {
-		return fmt.Errorf("error decodificando JSON")
+		return -1, fmt.Errorf("error decodificando JSON")
 	}
 
 	if !resp.Ok {
-		return fmt.Errorf(resp.Msg)
+		return -1, fmt.Errorf(resp.Msg)
 	}
 
-	return nil
+	return strconv.Atoi(resp.Msg)
 }

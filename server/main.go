@@ -393,7 +393,7 @@ func postLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 func postsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	logger.Info(fmt.Sprintf("Publicado post por %s", req.Header.Get("Username")))
+	logger.Info(fmt.Sprintf("Publicar post de %s", req.Header.Get("Username")))
 
 	var postContent model.PostContent
 	util.DecodeJSON(req.Body, &postContent)
@@ -404,7 +404,7 @@ func postsHandler(w http.ResponseWriter, req *http.Request) {
 	logger.Info(logMessage)
 	sendLog(logMessage)
 
-	util.EncodeJSON(model.Resp{Ok: true, Msg: "Post creado", Token: nil})
+	util.EncodeJSON(model.Resp{Ok: true, Msg: fmt.Sprintf("%v", post.Id), Token: nil})
 	response(w, true, "Post creado", nil)
 }
 
@@ -444,11 +444,7 @@ func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 		posts[i] = data.Posts[id]
 	}
 
-	logger.Info(fmt.Sprintf("Post ids: %v", data.PostIds))
-	logger.Info(fmt.Sprintf("Posts sent: %v, %v", posts, postids))
-	logger.Info(fmt.Sprintf("start end: %v, %v", start, end))
-
-	logger.Info("Enviados posts")
+	logger.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
 
 	err = json.NewEncoder(w).Encode(posts)
 	if err != nil {
