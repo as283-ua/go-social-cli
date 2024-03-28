@@ -1,15 +1,15 @@
 package repository
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"util/model"
 )
 
-var nextIdPosts = 0
-
 func CreatePost(db *model.Database, content string, author string, group string) model.Post {
-	post := model.Post{Id: nextIdPosts, Content: strings.TrimSpace(content), Author: author, Group: group, Date: time.Now()}
+	post := model.Post{Id: db.NextPostId, Content: strings.TrimSpace(content), Author: author, Group: group, Date: time.Now()}
 
 	// Si post pertenece a grupo, solo sale en feed de grupo, si no, sale publicamente para todos
 	if post.Group != "" {
@@ -20,12 +20,16 @@ func CreatePost(db *model.Database, content string, author string, group string)
 		(*db).GroupPosts[post.Group] = append((*db).GroupPosts[post.Group], post.Id)
 	} else {
 		(*db).Posts[post.Id] = post
-		(*db).PostIds = append((*db).PostIds, post.Id)
+		newPost := make([]int, 1)
+		newPost[0] = post.Id
+		fmt.Printf("new post %v, old posts %v", newPost, (*db).PostIds)
+		(*db).PostIds = slices.Concat(newPost, (*db).PostIds)
+		fmt.Printf("joint %v", (*db).PostIds)
 	}
 
 	(*db).UserPosts[post.Author] = append((*db).UserPosts[post.Author], post.Id)
 
-	nextIdPosts++
+	db.NextPostId++
 
 	return post
 }

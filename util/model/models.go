@@ -13,6 +13,7 @@ type Database struct {
 	UserGroups map[string][]string
 	UserNames  []string
 	PostIds    []int
+	NextPostId int
 }
 
 type User struct {

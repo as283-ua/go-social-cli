@@ -43,7 +43,7 @@ func saveDatabaseJSON() {
 	err := os.WriteFile("db.json", jsonData, 0644)
 	util.FailOnError(err)
 
-	// fmt.Println("Base de datos guardada en", "db.json")
+	fmt.Println("Base de datos guardada en", "db.json")
 }
 
 func saveDatabase() {
@@ -71,6 +71,7 @@ func loadDatabase() error {
 				GroupUsers: make(map[string][]string),
 				UserGroups: make(map[string][]string),
 				UserNames:  make([]string, 0),
+				NextPostId: 0,
 			}
 			return nil
 		}
@@ -420,10 +421,10 @@ func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	start := page * size
-	end := (page + 1) * size
+	end := start + size
 	n := len(data.PostIds)
-	if end >= n {
-		end = n - 1
+	if end > n {
+		end = n
 	}
 
 	var postids []int
@@ -442,6 +443,10 @@ func getPostsHandler(w http.ResponseWriter, req *http.Request) {
 	for i, id := range postids {
 		posts[i] = data.Posts[id]
 	}
+
+	logger.Info(fmt.Sprintf("Post ids: %v", data.PostIds))
+	logger.Info(fmt.Sprintf("Posts sent: %v, %v", posts, postids))
+	logger.Info(fmt.Sprintf("start end: %v, %v", start, end))
 
 	logger.Info("Enviados posts")
 

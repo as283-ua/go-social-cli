@@ -27,8 +27,20 @@ type PostListModel struct {
 	username       string
 	token          []byte
 	pagesLoaded    int
+	itemsOffset    int
 	canRequestMore bool
 }
+
+/*
+Aclaracion sobre componentes del modelo:
+	- Item offset. Inicialmente solo tenemos 5 posts cargados (ids 4, 3, 2, 1, 0) y se muestran los que se pueden. Si llegas al final de la pagina
+	se hace una peticion al servidor para la siguiente pagina (pagina 1, size 5). Sin embargo, si se ha creado algun post, digamos 2 por ejemplo,
+	ahora en bd tenemos los posts 6, 5, 4, 3, 2, 1, 0, por lo que la pagina 1 ahora empezaría por el post 1, el cual ya esta cargado y no haria falta cargar de nuevo.
+	Con el offset, nos saltamos los x primeros posts que hemos subido nosotros, para que no se repitan.
+	Si tenemos los posts 44 43 42 41 40 ..., subimos el 45 y 46, en la siguiente carga nos saltamos el 41 y 40 y solo usamos los otros 3 posts no vistos antes
+
+	- Can request more. Para evitar que se envian muchas peticiones aposta al llegar al final de la pagina, se fija un timer de 5 segundos que impide hacer peticiones de carga
+*/
 
 type TimerResetMsg struct{}
 type TimerCooldown struct{}
@@ -137,6 +149,13 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.msg = "Posted!"
 
+				m.viewport.GotoTop()
+				m.itemsOffset++
+
+				if m.itemsOffset >= 5 {
+					m.itemsOffset = 0
+				}
+
 				newPost := make([]string, 1)
 				newPost[0] = InitialPost(model.Post{Content: m.textbox.Value(), Author: m.username}).View()
 				m.posts = slices.Concat(newPost, m.posts)
@@ -145,7 +164,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textbox.Reset()
 			}
 		case "down":
-			if m.viewport.YOffset+5 > m.viewport.Height && m.canRequestMore {
+			if m.viewport.AtBottom() && m.canRequestMore {
 				return m, GetPostsMsg(m.pagesLoaded, m.client)
 			}
 		}
@@ -162,9 +181,18 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		postRender := InitialPost(model.Post{})
-		for _, post := range msg {
+		for i, post := range msg {
+			if i < m.itemsOffset {
+				continue
+			}
 			postRender.post = post
 			m.posts = append(m.posts, postRender.View())
+		}
+
+		m.itemsOffset -= 5
+
+		if m.itemsOffset < 0 {
+			m.itemsOffset = 0
 		}
 
 		m.msg = "Loaded posts"
