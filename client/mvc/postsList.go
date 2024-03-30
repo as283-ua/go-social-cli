@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"bytes"
+	"client/message"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -38,9 +39,6 @@ Aclaracion sobre componentes del modelo:
 
 	- Can request more. Para evitar que se envian muchas peticiones aposta al llegar al final de la pagina, se fija un timer de 5 segundos que impide hacer peticiones de carga
 */
-
-type TimerResetMsg struct{}
-type TimerCooldown struct{}
 
 type PostsMsg []model.Post
 
@@ -93,24 +91,6 @@ func GetPostsMsg(page int, client *http.Client) func() tea.Msg {
 		json.NewDecoder(res.Body).Decode(&posts)
 
 		return posts
-	}
-}
-
-func resetAfterTime(t time.Duration) func() tea.Msg {
-	return func() tea.Msg {
-		timer := time.NewTimer(t)
-		<-timer.C
-
-		return TimerResetMsg{}
-	}
-}
-
-func startCoolDown(t time.Duration) func() tea.Msg {
-	return func() tea.Msg {
-		timer := time.NewTimer(t)
-		<-timer.C
-
-		return TimerCooldown{}
 	}
 }
 
@@ -167,16 +147,16 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, GetPostsMsg(m.pagesLoaded, m.client)
 			}
 		}
-	case TimerResetMsg:
+	case message.ResetMsg:
 		m.msg = ""
-	case TimerCooldown:
+	case message.RequestLimitCooldown:
 		m.canRequestMore = true
 	case PostsMsg:
 
 		if len(msg) == 0 {
 			m.msg = "No new posts"
 			m.canRequestMore = false
-			return m, tea.Batch(postTboxCmd, viewPortCmd, resetAfterTime(5*time.Second), startCoolDown(5*time.Second))
+			return m, tea.Batch(postTboxCmd, viewPortCmd, message.SendTimedMessage(message.RequestLimitCooldown{}, 5*time.Second), message.SendTimedMessage(message.ResetMsg{}, 5*time.Second))
 		}
 
 		postRender := InitialPost(model.Post{})
@@ -197,7 +177,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.msg != "" {
-		return m, tea.Batch(postTboxCmd, viewPortCmd, resetAfterTime(5*time.Second))
+		return m, tea.Batch(postTboxCmd, viewPortCmd, message.SendTimedMessage(message.ResetMsg{}, 5*time.Second))
 	}
 
 	return m, tea.Batch(postTboxCmd, viewPortCmd)

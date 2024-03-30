@@ -83,6 +83,9 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 0:
 					cmd := GetPostsMsg(0, m.client)
 					return InitialPostListModel(m.username, m.token, m.client), cmd
+				case 1:
+					cmd := GetUserMsg(0, "", m.client)
+					return InitialUserSearchPageModel(m.username, m.token, "", m.client), cmd
 				case 2:
 					return InitialHomeModel("", nil, m.client), nil
 				}
