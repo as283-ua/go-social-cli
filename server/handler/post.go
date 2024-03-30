@@ -27,8 +27,7 @@ func CreatePostHandler(w http.ResponseWriter, req *http.Request) {
 	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
-	util.EncodeJSON(model.Resp{Ok: true, Msg: fmt.Sprintf("%v", post.Id), Token: nil})
-	etc.Response(w, true, "Post creado", nil)
+	etc.Response(w, true, fmt.Sprintf("%v", post.Id), nil)
 }
 
 func GetPostsHandler(w http.ResponseWriter, req *http.Request) {

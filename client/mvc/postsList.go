@@ -44,6 +44,8 @@ type TimerCooldown struct{}
 
 type PostsMsg []model.Post
 
+const postsPerReq = 10
+
 func InitialPostListModel(username string, token []byte, client *http.Client) PostListModel {
 	m := PostListModel{}
 
@@ -74,7 +76,7 @@ func InitialPostListModel(username string, token []byte, client *http.Client) Po
 
 func GetPostsMsg(page int, client *http.Client) func() tea.Msg {
 	return func() tea.Msg {
-		res, err := client.Get(fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=5", page))
+		res, err := client.Get(fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=%v", page, postsPerReq))
 
 		if err != nil {
 			return nil
@@ -248,7 +250,7 @@ func (m PostListModel) PublishPost() (int, error) {
 	err = util.DecodeJSON(res.Body, &resp)
 
 	if err != nil {
-		return -1, fmt.Errorf("error decodificando JSON")
+		return -1, fmt.Errorf(fmt.Sprintf("error decodificando JSON: %v", resp))
 	}
 
 	if !resp.Ok {

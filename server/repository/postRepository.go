@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -22,9 +21,7 @@ func CreatePost(db *model.Database, content string, author string, group string)
 		(*db).Posts[post.Id] = post
 		newPost := make([]int, 1)
 		newPost[0] = post.Id
-		fmt.Printf("new post %v, old posts %v", newPost, (*db).PostIds)
 		(*db).PostIds = slices.Concat(newPost, (*db).PostIds)
-		fmt.Printf("joint %v", (*db).PostIds)
 	}
 
 	(*db).UserPosts[post.Author] = append((*db).UserPosts[post.Author], post.Id)
