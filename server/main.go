@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"server/etc"
+	"server/handler"
 	"server/logging"
 	"server/middleware"
 	"server/repository"
@@ -136,25 +137,25 @@ func main() {
 
 	go saveState(intervalo) //multiplico por 1000 para que sean segundos
 
-	server := http.Server{
-		Addr: ":10443",
-	}
-
 	router := http.NewServeMux()
 
-	router.HandleFunc("POST /register", handler.registerHandler)
-	router.HandleFunc("POST /login", loginHandler)
-	router.HandleFunc("GET /login/cert", getLoginCertHandler)
-	router.HandleFunc("POST /login/cert", postLoginCertHandler)
+	router.HandleFunc("POST /register", handler.RegisterHandler)
+	router.HandleFunc("POST /login", handler.LoginHandler)
+	router.HandleFunc("GET /login/cert", handler.GetLoginCertHandler)
+	router.HandleFunc("POST /login/cert", handler.PostLoginCertHandler)
 	router.HandleFunc("GET /users", usersHandler)
-	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(postsHandler), &data))
+	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(postsHandler)))
 	router.HandleFunc("GET /posts", getPostsHandler)
-	router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(chatHandler), &data))
+	router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(chatHandler)))
 	router.Handle("GET /noauth/chat/{user}", http.HandlerFunc(chatHandler))
-	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(sendMessageHandler), &data))
-	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(getPkHandler), &data))
+	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(sendMessageHandler)))
+	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(getPkHandler)))
 
-	server.Handler = router
+	server := http.Server{
+		Addr:    ":10443",
+		Handler: middleware.InjectData(&data)(router),
+	}
+
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
 	util.FailOnError(server.ListenAndServeTLS("localhost.crt", "localhost.key"))
 }

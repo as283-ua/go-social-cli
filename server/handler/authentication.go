@@ -14,8 +14,6 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-var data *model.Database
-
 func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	w.Header().Set("Content-Type", "application/json")
@@ -33,6 +31,8 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	logging.SendLogRemote(logMessage)
 
 	w.Header().Set("Content-Type", "application/json")
+
+	data := etc.GetDb(req)
 
 	_, ok := data.Users[register.User]
 	if ok {
@@ -71,6 +71,8 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
+	data := etc.GetDb(req)
+
 	u, ok := data.Users[login.User]
 	if !ok {
 		etc.Response(w, false, "Usuario inexistente", nil)
@@ -97,6 +99,8 @@ func GetLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	username := req.URL.Query().Get("user")
 
 	logging.Info(fmt.Sprintf("Login por certificado GET, %s", username))
+
+	data := etc.GetDb(req)
 
 	_, ok := data.Users[username]
 
@@ -131,6 +135,8 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	username := req.URL.Query().Get("user")
 
 	logging.Info(fmt.Sprintf("Login por certificado POST, %s", username))
+
+	data := etc.GetDb(req)
 
 	user, ok := data.Users[username]
 

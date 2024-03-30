@@ -10,7 +10,7 @@ import (
 	"util/model"
 )
 
-func Authorization(next http.Handler, data *model.Database) http.Handler {
+func Authorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		token, err := util.Decode64(req.Header.Get("Authorization"))
 
@@ -22,11 +22,20 @@ func Authorization(next http.Handler, data *model.Database) http.Handler {
 			return
 		}
 
+		data := req.Context().Value(ContextKeyData).(*model.Database)
+
+		if data == nil {
+			logging.Info("DB nil")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		if err := validarToken(req.Header.Get("Username"), token, data); err != nil {
 			logging.Info(fmt.Sprintf("error de login. %s", err.Error()))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+
 		next.ServeHTTP(w, req)
 	})
 }
