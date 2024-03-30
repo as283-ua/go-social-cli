@@ -18,13 +18,8 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io"
-	"log/slog"
 	"os"
 )
-
-func GetLogger() *slog.Logger {
-	return slog.New(slog.Default().Handler())
-}
 
 // FailOnError comprueba y sale si hay errores (ahorra escritura en programas sencillos)
 func FailOnError(e error) {
