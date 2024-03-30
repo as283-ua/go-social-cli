@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"server/middleware"
+	"strconv"
 	"util"
 	"util/model"
 )
@@ -21,4 +22,31 @@ func GetDb(req *http.Request) *model.Database {
 		return nil
 	}
 	return db.(*model.Database)
+}
+
+func GetPaginationSizes(req *http.Request, dataLength int) (int, int, error) {
+
+	query := req.URL.Query()
+	pageStr := query.Get("page")
+	sizeStr := query.Get("size")
+	page := 0
+	size := dataLength
+
+	if pageStr != "" {
+		p, err := strconv.Atoi(pageStr)
+		if err != nil {
+			return 0, 0, err
+		}
+		page = p
+	}
+
+	if sizeStr != "" {
+		s, err := strconv.Atoi(sizeStr)
+		if err != nil {
+			return 0, 0, err
+		}
+		size = s
+	}
+
+	return page, size, nil
 }

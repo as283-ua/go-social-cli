@@ -8,11 +8,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"server/etc"
 	"server/handler"
 	"server/logging"
 	"server/middleware"
-	"server/repository"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,13 +18,6 @@ import (
 	"util"
 	"util/model"
 )
-
-func NewTupleAlphabeticOrder(a, b string) model.UserChat {
-	if a <= b {
-		return model.UserChat{First: a, Second: b}
-	}
-	return model.UserChat{First: b, Second: a}
-}
 
 var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
 
@@ -143,13 +134,12 @@ func main() {
 	router.HandleFunc("POST /login", handler.LoginHandler)
 	router.HandleFunc("GET /login/cert", handler.GetLoginCertHandler)
 	router.HandleFunc("POST /login/cert", handler.PostLoginCertHandler)
-	router.HandleFunc("GET /users", usersHandler)
-	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(postsHandler)))
-	router.HandleFunc("GET /posts", getPostsHandler)
-	router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(chatHandler)))
-	router.Handle("GET /noauth/chat/{user}", http.HandlerFunc(chatHandler))
-	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(sendMessageHandler)))
-	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(getPkHandler)))
+	router.HandleFunc("GET /users", handler.GetUserNamesHandler)
+	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(handler.CreatePostHandler)))
+	router.HandleFunc("GET /posts", handler.GetPostsHandler)
+	router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(handler.ChatHandler)))
+	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.SendMessageHandler)))
+	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(handler.GetPubKeyHandler)))
 
 	server := http.Server{
 		Addr:    ":10443",
@@ -158,170 +148,4 @@ func main() {
 
 	fmt.Printf("Servidor escuchando en https://localhost:10443\n")
 	util.FailOnError(server.ListenAndServeTLS("localhost.crt", "localhost.key"))
-}
-
-func getPaginationSizes(req *http.Request) (int, int, error) {
-
-	query := req.URL.Query()
-	pageStr := query.Get("page")
-	sizeStr := query.Get("size")
-	page := 0
-	size := len(data.UserNames)
-
-	if pageStr != "" {
-		p, err := strconv.Atoi(pageStr)
-		if err != nil {
-			return 0, 0, err
-		}
-		page = p
-	}
-
-	if sizeStr != "" {
-		s, err := strconv.Atoi(sizeStr)
-		if err != nil {
-			return 0, 0, err
-		}
-		size = s
-	}
-
-	return page, size, nil
-}
-
-func usersHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	page, size, err := getPaginationSizes(req)
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	start := page * size
-	end := (page + 1) * size
-
-	if end >= len(data.UserNames) {
-		end = len(data.UserNames)
-	}
-
-	err = json.NewEncoder(w).Encode(data.UserNames[start:end])
-	util.FailOnError(err)
-}
-
-func postsHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	logging.Info(fmt.Sprintf("Publicar post de %s", req.Header.Get("Username")))
-
-	var postContent model.PostContent
-	util.DecodeJSON(req.Body, &postContent)
-	req.Body.Close()
-
-	post := repository.CreatePost(&data, postContent.Content, req.Header.Get("Username"), "")
-	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
-	logging.Info(logMessage)
-	logging.SendLogRemote(logMessage)
-
-	util.EncodeJSON(model.Resp{Ok: true, Msg: fmt.Sprintf("%v", post.Id), Token: nil})
-	etc.Response(w, true, "Post creado", nil)
-}
-
-func getPostsHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	logging.Info(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
-
-	page, size, err := getPaginationSizes(req)
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	start := page * size
-	end := start + size
-	n := len(data.PostIds)
-	if end > n {
-		end = n
-	}
-
-	var postids []int
-	if n <= start {
-		postids = nil
-		end = 0
-		start = 0
-	} else {
-		if n < end {
-			end = n
-		}
-		postids = data.PostIds[start:end]
-	}
-
-	posts := make([]model.Post, end-start)
-	for i, id := range postids {
-		posts[i] = data.Posts[id]
-	}
-
-	logging.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
-
-	err = json.NewEncoder(w).Encode(posts)
-	if err != nil {
-		logging.Error("Error enviando")
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-func chatHandler(w http.ResponseWriter, req *http.Request) {
-	logging.Info("Chat handler")
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	//username := req.Header.Get\("Username")
-	otherUser := req.PathValue("user")
-
-	if _, ok := data.Users[otherUser]; !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	// _, ok := data.Chats[NewTupleAlphabeticOrder(username, otherUser)]
-	// if !ok {
-	// 	data.Chats[NewTupleAlphabeticOrder(username, otherUser)] = make([]model.Message, 0)
-	// }
-
-	// test
-	for i := 0; i < 10; i++ {
-		msg := fmt.Sprintf("Event %d", i)
-		logging.Info(fmt.Sprintf("Sending: %s", msg))
-		fmt.Fprintf(w, "data: %s\n\n", msg)
-		time.Sleep(1 * time.Second)
-		w.(http.Flusher).Flush()
-	}
-
-	// <-req.Context().Done()
-	// fmt.Println("Connection closed")
-}
-
-func sendMessageHandler(w http.ResponseWriter, req *http.Request) {
-	logging.Info("Message handler")
-	w.WriteHeader(http.StatusOK)
-}
-
-func getPkHandler(w http.ResponseWriter, req *http.Request) {
-	logging.Info("PK handler")
-	w.Header().Set("Content-Type", "application/json")
-
-	otherUser := req.PathValue("user")
-
-	u, ok := data.Users[otherUser]
-	if !ok {
-		etc.Response(w, false, "Usuario no encontrado", nil)
-		return
-	}
-
-	err := json.NewEncoder(w).Encode(u.PubKey)
-	util.FailOnError(err)
 }
