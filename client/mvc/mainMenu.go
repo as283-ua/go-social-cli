@@ -109,10 +109,5 @@ func (m HomePage) View() string {
 
 	s += "\nPresione 'q' o 'ctrl-c' para salir\n\n"
 
-	// y := 15
-	// for i := 0; i < y; i++ {
-	// 	s += "\n"
-	// }
-
 	return s
 }
