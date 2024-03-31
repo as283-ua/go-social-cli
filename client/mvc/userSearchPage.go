@@ -102,6 +102,10 @@ func (m UserSearchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.onSearchBtn = true
 				m.searchBar.Focus()
 			}
+		case "m":
+			if m.token != nil && m.selectedUser >= 0 {
+				return InitialChatPageModel(m.myUsername, m.token, m.client, m.usernames[m.selectedUser]), LoadChat(m.myUsername, m.usernames[m.selectedUser])
+			}
 		case "enter":
 			if m.onSearchBtn {
 				return InitialUserSearchPageModel(m.myUsername, m.token, m.searchBar.Value(), m.client), GetUserMsg(0, m.searchBar.Value(), m.client)

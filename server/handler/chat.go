@@ -8,15 +8,7 @@ import (
 	"server/logging"
 	"time"
 	"util"
-	"util/model"
 )
-
-func NewTupleAlphabeticOrder(a, b string) model.UserChat {
-	if a <= b {
-		return model.UserChat{First: a, Second: b}
-	}
-	return model.UserChat{First: b, Second: a}
-}
 
 func ChatHandler(w http.ResponseWriter, req *http.Request) {
 	logging.Info("Chat handler")

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"server/etc"
 	"server/logging"
+	"strings"
 	"time"
 	"util"
 	"util/model"
@@ -23,6 +24,11 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	util.DecodeJSON(req.Body, &register)
 	if register.User == "" || register.Pass == "" || register.PubKey == nil {
 		etc.Response(w, false, "Campos vacíos", nil)
+		return
+	}
+
+	if strings.ContainsAny(register.User, "@&?=/:;") {
+		etc.Response(w, false, "Carácteres no válidos '@&?=/:;'", nil)
 		return
 	}
 

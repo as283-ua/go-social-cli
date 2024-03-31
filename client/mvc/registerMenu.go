@@ -12,7 +12,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"golang.org/x/term"
 )
 
 type RegisterPage struct {
@@ -83,18 +82,18 @@ func (m RegisterPage) View() string {
 	s += m.username.View() + "\n"
 	s += m.password.View() + "\n\n"
 
-	lines := 5
+	// lines := 5
 
 	if m.msg != "" {
-		lines = 7
+		// lines = 7
 		s += "Info: " + m.msg + "\n\n"
 	}
 
-	_, y, _ := term.GetSize(0)
+	// _, y, _ := term.GetSize(0)
 
-	for i := 0; i < y-lines; i++ {
-		s += "\n"
-	}
+	// for i := 0; i < y-lines-1; i++ {
+	// 	s += "\n"
+	// }
 
 	return s
 }

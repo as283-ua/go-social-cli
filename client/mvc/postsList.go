@@ -191,12 +191,9 @@ func (m PostListModel) View() string {
 
 	s += "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n\n"
 
-	if m.username != "" {
+	if m.token != nil {
 		s += fmt.Sprintf("Post as %s:\n", m.username)
 		s += m.textbox.View() + "\n"
-	}
-
-	if m.token != nil {
 		s += "ctrl+s to post\n"
 	}
 

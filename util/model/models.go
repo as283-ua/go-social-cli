@@ -26,11 +26,6 @@ type User struct {
 	PubKey []byte
 }
 
-type UserChat struct {
-	First  string
-	Second string
-}
-
 type Group struct {
 	Name string
 }
@@ -52,4 +47,15 @@ type Message struct {
 	From string
 	Data string
 	Read bool
+}
+
+type ChatMessage struct {
+	Sender  string
+	Message string
+}
+
+type Chat struct {
+	UserA    string
+	UserB    string
+	Messages []ChatMessage
 }
