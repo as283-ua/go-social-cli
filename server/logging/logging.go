@@ -34,6 +34,10 @@ func Error(msg string) {
 	defaultLogger.Error(msg)
 }
 
+func Errorf(msg string, a ...any) {
+	defaultLogger.Error(fmt.Sprintf(msg, a...))
+}
+
 func Info(msg string) {
 	defaultLogger.Info(msg)
 }

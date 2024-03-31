@@ -59,6 +59,7 @@ func loadDatabase() error {
 				UserGroups:       make(map[string][]string),
 				UserNames:        make([]string, 0),
 				PendingCertLogin: make(map[string][]byte),
+				PendingMessages:  make(map[string][]model.Message),
 				NextPostId:       0,
 			}
 			return nil
@@ -137,9 +138,13 @@ func main() {
 	router.HandleFunc("GET /users", handler.GetUserNamesHandler)
 	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(handler.CreatePostHandler)))
 	router.HandleFunc("GET /posts", handler.GetPostsHandler)
-	router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(handler.ChatHandler)))
+	// router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(handler.ChatConnectionHandler)))
 	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.SendMessageHandler)))
+	router.Handle("GET /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.GetPendingMessages)))
 	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(handler.GetPubKeyHandler)))
+
+	router.Handle("POST /noauth/chat/{user}/message", http.HandlerFunc(handler.SendMessageHandler))
+	router.Handle("GET /noauth/chat/{user}/message", http.HandlerFunc(handler.GetPendingMessages))
 
 	server := http.Server{
 		Addr:    ":10443",

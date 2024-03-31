@@ -15,7 +15,14 @@ type Database struct {
 	PostIds          []int
 	NextPostId       int
 	PendingCertLogin map[string][]byte
+	PendingMessages  map[string][]Message
 }
+
+/*
+Pending Chat Messages: la clave ser aun string con formato usuario1->usuario2. La clave es una lista de mensajes que el usuario1
+ha enviado al usuario2, que el usuario 2 aun no ha leido. Al recibir dichos mensajes (solo descifrables por el usuario2) se borran de
+esta tabla.
+*/
 
 type User struct {
 	Name   string
@@ -44,18 +51,13 @@ type Post struct {
 }
 
 type Message struct {
-	From string
-	Data string
-	Read bool
-}
-
-type ChatMessage struct {
-	Sender  string
-	Message string
+	Sender    string
+	Message   string
+	Timestamp time.Time
 }
 
 type Chat struct {
 	UserA    string
 	UserB    string
-	Messages []ChatMessage
+	Messages []Message
 }

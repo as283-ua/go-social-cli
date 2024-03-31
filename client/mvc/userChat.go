@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func MessageToString(m model.ChatMessage, senderStyle lipgloss.Style) string {
+func MessageToString(m model.Message, senderStyle lipgloss.Style) string {
 	return senderStyle.Render("@"+m.Sender) + "\n" + m.Message + "\n"
 }
 
@@ -44,7 +44,7 @@ func InitialChatPageModel(myUsername string, token []byte, client *http.Client, 
 	m.chat = model.Chat{
 		UserA:    myUsername,
 		UserB:    username,
-		Messages: make([]model.ChatMessage, 0),
+		Messages: make([]model.Message, 0),
 	}
 
 	m.textbox = textarea.New()
@@ -96,7 +96,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.viewport.GotoBottom()
 
-				message := model.ChatMessage{Sender: m.myUsername, Message: strings.TrimSpace(m.textbox.Value())}
+				message := model.Message{Sender: m.myUsername, Message: strings.TrimSpace(m.textbox.Value())}
 
 				m.chat.Messages = append(m.chat.Messages, message)
 				m.messagesStr += MessageToString(message, m.meStyle) + "\n"
@@ -106,7 +106,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case message.ReceiveMessageMsg:
-		message := model.ChatMessage{Sender: msg.Sender, Message: strings.TrimSpace(msg.Message)}
+		message := model.Message(msg)
 
 		m.chat.Messages = append(m.chat.Messages, message)
 		m.messagesStr += MessageToString(message, m.otherStyle) + "\n"
@@ -148,7 +148,7 @@ func LoadChat(username string, usernameOther string) func() tea.Msg {
 		return message.ChatMsg{
 			UserA:    username,
 			UserB:    usernameOther,
-			Messages: make([]model.ChatMessage, 0),
+			Messages: make([]model.Message, 0),
 		}
 	}
 }

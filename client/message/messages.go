@@ -9,7 +9,7 @@ import (
 
 type RequestLimitCooldown struct{}
 type ResetMsg struct{}
-type ReceiveMessageMsg model.ChatMessage
+type ReceiveMessageMsg model.Message
 type ChatMsg model.Chat
 
 func SendTimedMessage(msg interface{}, t time.Duration) func() tea.Msg {
