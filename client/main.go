@@ -213,7 +213,7 @@ func postPost(client *http.Client) error {
 	req.Header.Add("content-type", "application/json")
 
 	req.Header.Add("Authorization", util.Encode64(token))
-	req.Header.Add("UserName", UserName)
+	req.Header.Add("Username", UserName)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -261,7 +261,7 @@ func testSSE(client *http.Client, user string) {
 	req.Header.Set("Accept", "text/event-stream")
 
 	req.Header.Add("Authorization", util.Encode64(token))
-	req.Header.Add("UserName", UserName)
+	req.Header.Add("Username", UserName)
 
 	resp, err := client.Do(req)
 	if err != nil {

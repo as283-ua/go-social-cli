@@ -95,6 +95,8 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 		u.Token = make([]byte, 16)
 		rand.Read(u.Token)
 		data.Users[u.Name] = u
+
+		logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
 		etc.Response(w, true, "Credenciales válidas", u.Token)
 	}
 }

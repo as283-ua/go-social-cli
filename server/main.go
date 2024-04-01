@@ -141,7 +141,7 @@ func main() {
 	// router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(handler.ChatConnectionHandler)))
 	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.SendMessageHandler)))
 	router.Handle("GET /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.GetPendingMessages)))
-	router.Handle("GET /chat/{user}/pk", middleware.Authorization(http.HandlerFunc(handler.GetPubKeyHandler)))
+	router.Handle("GET /chat/{user}/pk", http.HandlerFunc(handler.GetPubKeyHandler))
 
 	router.Handle("POST /noauth/chat/{user}/message", http.HandlerFunc(handler.SendMessageHandler))
 	router.Handle("GET /noauth/chat/{user}/message", http.HandlerFunc(handler.GetPendingMessages))

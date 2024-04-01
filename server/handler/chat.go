@@ -82,6 +82,7 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 	reqUser := req.Header.Get("Username")
 
 	if otherUser == reqUser {
+		logging.Error("Nombres iguales")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -90,7 +91,10 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 
 	_, ok := data.Users[otherUser]
 
+	logging.Info("Hola")
+
 	if !ok {
+		logging.Error("Usuario no encontrado")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -107,8 +111,6 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 
 	messages = append(messages, msg)
 	data.PendingMessages[key] = messages
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func GetPendingMessages(w http.ResponseWriter, req *http.Request) {
