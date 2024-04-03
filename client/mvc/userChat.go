@@ -23,7 +23,7 @@ import (
 )
 
 func MessageToString(m model.Message, senderStyle lipgloss.Style) string {
-	return senderStyle.Render("@"+m.Sender) + " - " + m.Timestamp.Format("2 Jan 2006 15:04:05") + "\n" + m.Message + "\n"
+	return fmt.Sprintf("%s - %s\n%s\n", senderStyle.Render("@"+m.Sender), m.Timestamp.Format("2 Jan 2006 15:04:05"), m.Message)
 }
 
 type ChatPage struct {
@@ -105,7 +105,6 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				m.msg = err.Error()
 			} else {
-				m.viewport.GotoBottom()
 
 				message := model.Message{Sender: m.myUsername, Message: strings.TrimSpace(m.textbox.Value()), Timestamp: time.Now()}
 
@@ -113,9 +112,9 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messagesStr += MessageToString(message, m.meStyle) + "\n"
 
 				m.viewport.SetContent(m.messagesStr)
-				m.textbox.Reset()
+				m.viewport.GotoBottom()
 
-				// m.msg = "Enviado mensaje"
+				m.textbox.Reset()
 			}
 		case "ctrl+s":
 			err := m.SaveChat()
@@ -133,6 +132,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messagesStr += MessageToString(message, m.otherStyle) + "\n"
 
 		m.viewport.SetContent(m.messagesStr)
+
 		m.msg = "Recibido mensaje"
 	case message.ChatMsg:
 		m.chat = model.Chat(msg)
@@ -148,6 +148,8 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.viewport.SetContent(m.messagesStr)
+		m.viewport.GotoBottom()
+
 		m.msg = "Cargado chat"
 	case error:
 		m.msg = fmt.Sprintf("error. %s", msg.Error())
@@ -176,12 +178,7 @@ func (m ChatPage) View() string {
 func (m *ChatPage) Send() error {
 	url := fmt.Sprintf("https://localhost:10443/chat/%s/message", m.username)
 
-	body := make(map[string]string)
-	body["Message"] = string(util.Encrypt([]byte(m.textbox.Value()), m.chat.Key))
-
-	somethign, _ := util.Decrypt([]byte(body["Message"]), m.chat.Key)
-
-	m.msg = string(somethign)
+	body := model.Message{Message: util.Encode64(util.Encrypt([]byte(m.textbox.Value()), m.chat.Key)), Sender: m.myUsername}
 
 	bodyBytes := util.EncodeJSON(body)
 
@@ -315,12 +312,17 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 			chat.Key = aeskey
 		} else if prevChat && newMessages {
 			for i, message := range unread {
-				msgBytes, err := util.Decrypt([]byte(message.Message), chat.Key)
+				decoded, err := util.Decode64(message.Message)
+
 				if err != nil {
-					return fmt.Errorf("error desencriptando con la clave simetrica")
+					return fmt.Errorf("error decodificando")
 				}
-				unread[i].Message = message.Message + "----" + string(msgBytes)
-				panic(unread[i].Message)
+
+				msgBytes, err := util.Decrypt(decoded, chat.Key)
+				if err != nil {
+					return fmt.Errorf("error descifrando con la clave simetrica")
+				}
+				unread[i].Message = string(msgBytes)
 			}
 			chat.Messages = slices.Concat(chat.Messages, unread)
 		} else if newMessages { // chat nuevo iniciado por otro usuario
@@ -339,11 +341,17 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 			unread = unread[1:]
 
 			for i, message := range unread {
-				msgStr, err := util.Decrypt([]byte(message.Message), chat.Key)
+				decoded, err := util.Decode64(message.Message)
+
 				if err != nil {
-					return fmt.Errorf("error desencriptando con la clave simetrica")
+					return fmt.Errorf("error decodificando")
 				}
-				unread[i].Message = string(msgStr)
+
+				msgBytes, err := util.Decrypt(decoded, chat.Key)
+				if err != nil {
+					return fmt.Errorf("error descifrando con la clave simetrica")
+				}
+				unread[i].Message = string(msgBytes)
 			}
 
 			chat.Messages = unread

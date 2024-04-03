@@ -81,6 +81,8 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 	otherUser := req.PathValue("user")
 	reqUser := req.Header.Get("Username")
 
+	logging.Info(fmt.Sprintf("msg received %v from %s to %s", msg.Message, reqUser, otherUser))
+
 	if otherUser == reqUser {
 		logging.Error("Nombres iguales")
 		w.WriteHeader(http.StatusBadRequest)
@@ -90,8 +92,6 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 	data := etc.GetDb(req)
 
 	_, ok := data.Users[otherUser]
-
-	logging.Info("Hola")
 
 	if !ok {
 		logging.Error("Usuario no encontrado")
