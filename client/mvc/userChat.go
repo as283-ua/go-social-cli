@@ -124,6 +124,9 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.msg = "Chat guardado"
 			}
+		case "ctrl+r":
+			return InitialChatPageModel(m.myUsername, m.token, m.client, m.username),
+				LoadChat(m.myUsername, m.token, m.username, m.client)
 		}
 	case message.ReceiveMessageMsg:
 		message := model.Message(msg)

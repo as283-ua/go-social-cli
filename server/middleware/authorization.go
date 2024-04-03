@@ -14,7 +14,7 @@ func Authorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		token, err := util.Decode64(req.Header.Get("Authorization"))
 
-		logging.Info(fmt.Sprintf("Token %v", token))
+		// logging.Info(fmt.Sprintf("Token %v", token))
 		if err != nil {
 			logging.Info("error de login. No se ha podido decodificar el header 'Authorization'")
 			w.WriteHeader(http.StatusInternalServerError)
