@@ -229,10 +229,9 @@ func ParsePublicKey(pubBytes []byte) *rsa.PublicKey {
 	return pubKey.(*rsa.PublicKey)
 }
 
-func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) []byte {
+func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) ([]byte, error) {
 	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, data, nil)
-	FailOnError(err)
-	return out
+	return out, err
 }
 
 func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {

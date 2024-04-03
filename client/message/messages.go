@@ -12,6 +12,7 @@ type ResetMsg struct{}
 type ReceiveMessageMsg model.Message
 type ChatMsg model.Chat
 type UnreadMsg []model.Message
+type FirstChatMsg struct{}
 
 func SendTimedMessage(msg interface{}, t time.Duration) func() tea.Msg {
 	return func() tea.Msg {

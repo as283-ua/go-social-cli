@@ -110,7 +110,7 @@ func (m RegisterPage) Register() ([]byte, error) {
 	var privateKey *rsa.PrivateKey
 	if _, err := os.Stat(fmt.Sprintf("%s.key", username)); err != nil {
 		// no hay err -> el archivo no existe
-		pk, err := rsa.GenerateKey(rand.Reader, 2048)
+		pk, err := rsa.GenerateKey(rand.Reader, 3072)
 		privateKey = pk
 		util.FailOnError(err)
 
@@ -118,10 +118,10 @@ func (m RegisterPage) Register() ([]byte, error) {
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
 	} else {
-		privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
-		if err != nil {
-			return nil, err
-		}
+		// privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+		// if err != nil {
+		// 	return nil, err
+		// }
 		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
 	}
 
@@ -140,8 +140,15 @@ func (m RegisterPage) Register() ([]byte, error) {
 	if !r.Ok {
 		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	} else {
-		msg, _ := util.Decode64(r.Msg)
-		util.DecryptWithRSA(msg, privateKey)
+		// msg, _ := util.Decode64(r.Msg)
+		// dec := util.DecryptWithRSA(msg, privateKey)
+
+		// pubkey := util.ParsePublicKey(util.ReadPublicKeyBytesFromFile(username + ".pub"))
+		// privkey, _ := util.ReadRSAKeyFromFile(username + ".key")
+
+		// d, _ := util.EncryptWithRSA([]byte("Bienvenido a la red social"), pubkey)
+		// b := util.DecryptWithRSA(d, privkey)
+
 		token = r.Token
 	}
 

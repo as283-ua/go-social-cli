@@ -62,7 +62,12 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	data.Users[u.Name] = u
 	data.UserNames = append(data.UserNames, u.Name)
 
-	encryptedMsg := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	encryptedMsg, err := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		etc.Response(w, false, "Error de clave publica", nil)
+		return
+	}
 	etc.Response(w, true, util.Encode64(encryptedMsg), u.Token)
 }
 
@@ -163,14 +168,14 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	signature := make([]byte, 256)
+	signature := make([]byte, 384)
 	req.Body.Read(signature)
 
 	err := util.CheckSignatureRSA(realToken, signature, util.ParsePublicKey(user.PubKey))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		logging.Info("Clave incorrecta")
-		etc.Response(w, false, "Clave incorrecta", nil)
+		etc.Response(w, false, "Clave RSA incorrecta", nil)
 		return
 	}
 

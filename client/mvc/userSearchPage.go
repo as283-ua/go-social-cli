@@ -105,10 +105,7 @@ func (m UserSearchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "m":
 			if m.token != nil && m.selectedUser >= 0 && m.usernames[m.selectedUser] != m.myUsername {
 				return InitialChatPageModel(m.myUsername, m.token, m.client, m.usernames[m.selectedUser]),
-					tea.Batch(
-						LoadChat(m.myUsername, m.usernames[m.selectedUser]),
-						DownloadUnread(m.myUsername, m.token, m.usernames[m.selectedUser], m.client),
-					)
+					LoadChat(m.myUsername, m.token, m.usernames[m.selectedUser], m.client)
 			}
 		case "enter":
 			if m.onSearchBtn {

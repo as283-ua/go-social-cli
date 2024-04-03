@@ -3,8 +3,10 @@ package mvc
 import (
 	"bytes"
 	"client/message"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -113,7 +115,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.SetContent(m.messagesStr)
 				m.textbox.Reset()
 
-				m.msg = "Enviado mensaje"
+				// m.msg = "Enviado mensaje"
 			}
 		case "ctrl+s":
 			err := m.SaveChat()
@@ -133,13 +135,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.messagesStr)
 		m.msg = "Recibido mensaje"
 	case message.ChatMsg:
-		if len(m.chat.Messages) == 0 {
-			m.chat.Messages = msg.Messages
-		} else {
-			// primero el chat recien cargado y luego los mensajes no leidos descargados de antes (deberian ser mas nuevos)
-			m.chat.Messages = slices.Concat(m.chat.Messages, msg.Messages)
-			m.messagesStr = ""
-		}
+		m.chat = model.Chat(msg)
 
 		for _, message := range m.chat.Messages {
 			if message.Sender == m.myUsername {
@@ -152,17 +148,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.viewport.SetContent(m.messagesStr)
-		m.msg = "Cargado chat de archivo local"
-	case message.UnreadMsg:
-		m.chat.Messages = slices.Concat(m.chat.Messages, msg)
-
-		for _, message := range msg {
-			m.messagesStr += MessageToString(message, m.meStyle) + "\n"
-		}
-
-		m.viewport.SetContent(m.messagesStr)
-
-		m.msg = fmt.Sprintf("Descargado %v nuevos mensajes", len(msg))
+		m.msg = "Cargado chat"
 	case error:
 		m.msg = fmt.Sprintf("error. %s", msg.Error())
 	}
@@ -191,7 +177,11 @@ func (m *ChatPage) Send() error {
 	url := fmt.Sprintf("https://localhost:10443/chat/%s/message", m.username)
 
 	body := make(map[string]string)
-	body["Message"] = m.textbox.Value()
+	body["Message"] = string(util.Encrypt([]byte(m.textbox.Value()), m.chat.Key))
+
+	somethign, _ := util.Decrypt([]byte(body["Message"]), m.chat.Key)
+
+	m.msg = string(somethign)
 
 	bodyBytes := util.EncodeJSON(body)
 
@@ -217,26 +207,203 @@ func (m *ChatPage) Send() error {
 	return nil
 }
 
-func LoadChat(username string, usernameOther string) func() tea.Msg {
+func SendKey(username string, token []byte, usernameOther string, client *http.Client) ([]byte, error) {
+	resp, err := client.Get(fmt.Sprintf("https://localhost:10443/chat/%s/pubkey", usernameOther))
+
+	if err != nil {
+		return nil, fmt.Errorf("error conectando con servidor para conseguir clave publica de %s", usernameOther)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, fmt.Errorf("error leyendo body")
+	}
+
+	pubkeybytes, err := util.Decode64(string(body))
+
+	if err != nil {
+		return nil, fmt.Errorf("error decodificando de base 64")
+	}
+
+	var aeskey = make([]byte, 32)
+	rand.Read(aeskey)
+
+	pubkey := util.ParsePublicKey(pubkeybytes)
+
+	encryptedKey, err := util.EncryptWithRSA(aeskey, pubkey)
+
+	if err != nil {
+		return nil, fmt.Errorf("error encriptando la clave aes")
+	}
+
+	url := fmt.Sprintf("https://localhost:10443/chat/%s/message", usernameOther)
+
+	bodyReq := make(map[string]string)
+	bodyReq["Message"] = util.Encode64(encryptedKey)
+	_, err = util.Decode64(bodyReq["Message"])
+
+	if err != nil {
+		return nil, fmt.Errorf("decodificando lo que acabas de codificar")
+	}
+	bodyBytes := util.EncodeJSON(bodyReq)
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+
+	if err != nil {
+		return nil, fmt.Errorf("error creando request")
+	}
+
+	req.Header.Add("Authorization", util.Encode64(token))
+	req.Header.Add("Username", username)
+
+	resp, err = client.Do(req)
+
+	if err != nil {
+		return nil, fmt.Errorf("error conectando con servidor para enviar clave simetrica a %s", usernameOther)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("status %v", resp.StatusCode)
+	}
+
+	return aeskey, nil
+}
+
+func LoadChat(username string, token []byte, usernameOther string, client *http.Client) func() tea.Msg {
 	return func() tea.Msg {
-		chat := model.Chat{}
-		chatJson, err := os.ReadFile(fmt.Sprintf("./chats/%s/%s.json", username, usernameOther))
+		chat := model.Chat{UserA: username, UserB: usernameOther, Messages: make([]model.Message, 0)}
+		unread := make([]model.Message, 0)
+		loadMsg := LoadSavedChat(username, usernameOther)
+		downloadMsg := DownloadUnread(username, token, usernameOther, client)
 
-		if err != nil {
-			return err
+		// opciones: ambos vacios -> primera vez que nos contactamos username y yo, hay que enviar clave aes con rsa
+		// hay nuevos mensajes pero no chat guardado, primer mensaje debe contener clave aes porque el otro ha iniciado chat
+		// 		habria que ver que hacer si se borra chat manualmente, porque el nuevo mensaje no sera una clave aes
+		// chat cargado pero sin mensajes nuevos -> todo gucci
+		// chat cargado Y nuevos mensajes -> unir mensajes y devolver como message.ChatMsg
+
+		var (
+			prevChat    = false
+			newMessages = false
+		)
+
+		switch loadMsg := loadMsg.(type) {
+		case error:
+			return loadMsg
+		case message.FirstChatMsg:
+			prevChat = false
+		case message.ChatMsg:
+			chat = model.Chat(loadMsg)
+			prevChat = true
 		}
 
-		err = json.Unmarshal(chatJson, &chat)
-
-		if err != nil {
-			return err
+		switch downloadMsg := downloadMsg.(type) {
+		case error:
+			return loadMsg
+		case message.UnreadMsg:
+			unread = downloadMsg
 		}
 
-		return chat
+		newMessages = len(unread) != 0
+
+		if !prevChat && !newMessages {
+			aeskey, err := SendKey(username, token, usernameOther, client)
+			if err != nil {
+				return err
+			}
+			chat.Key = aeskey
+		} else if prevChat && newMessages {
+			for i, message := range unread {
+				msgBytes, err := util.Decrypt([]byte(message.Message), chat.Key)
+				if err != nil {
+					return fmt.Errorf("error desencriptando con la clave simetrica")
+				}
+				unread[i].Message = message.Message + "----" + string(msgBytes)
+				panic(unread[i].Message)
+			}
+			chat.Messages = slices.Concat(chat.Messages, unread)
+		} else if newMessages { // chat nuevo iniciado por otro usuario
+			privKey, err := util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
+			if err != nil {
+				return fmt.Errorf("error obteniendo clave privada")
+			}
+
+			decoded, err := util.Decode64(unread[0].Message)
+			if err != nil {
+				return fmt.Errorf("error decodificando mensaje")
+			}
+
+			chat.Key = util.DecryptWithRSA(decoded, privKey)
+
+			unread = unread[1:]
+
+			for i, message := range unread {
+				msgStr, err := util.Decrypt([]byte(message.Message), chat.Key)
+				if err != nil {
+					return fmt.Errorf("error desencriptando con la clave simetrica")
+				}
+				unread[i].Message = string(msgStr)
+			}
+
+			chat.Messages = unread
+		}
+
+		return message.ChatMsg(chat)
 	}
 }
 
+func LoadSavedChat(username string, usernameOther string) tea.Msg {
+	chat := model.Chat{}
+	chatJson, err := os.ReadFile(fmt.Sprintf("./chats/%s/%s.json", username, usernameOther))
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return message.FirstChatMsg{}
+		}
+		return err
+	}
+
+	err = json.Unmarshal(chatJson, &chat)
+
+	if err != nil {
+		return err
+	}
+
+	return message.ChatMsg(chat)
+}
+
+func DownloadUnread(username string, token []byte, usernameOther string, client *http.Client) tea.Msg {
+	url := fmt.Sprintf("https://localhost:10443/chat/%s/message", usernameOther)
+
+	req, err := http.NewRequest("GET", url, &bytes.Reader{})
+
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Authorization", util.Encode64(token))
+	req.Header.Add("Username", username)
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %v", resp.StatusCode)
+	}
+
+	var body = make([]model.Message, 0)
+	util.DecodeJSON(resp.Body, &body)
+	return message.UnreadMsg(body)
+}
+
 func (m *ChatPage) SaveChat() error {
+	if m.chat.Key == nil {
+		return nil
+	}
 	chatJson, err := json.Marshal(m.chat)
 
 	if err != nil {
@@ -270,33 +437,4 @@ func (m *ChatPage) SaveChat() error {
 	}
 
 	return nil
-}
-
-func DownloadUnread(username string, token []byte, usernameOther string, client *http.Client) func() tea.Msg {
-	return func() tea.Msg {
-		url := fmt.Sprintf("https://localhost:10443/chat/%s/message", usernameOther)
-
-		req, err := http.NewRequest("GET", url, &bytes.Reader{})
-
-		if err != nil {
-			return err
-		}
-
-		req.Header.Add("Authorization", util.Encode64(token))
-		req.Header.Add("Username", username)
-
-		resp, err := client.Do(req)
-
-		if err != nil {
-			return err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("status: %v", resp.StatusCode)
-		}
-
-		var body = make([]model.Message, 0)
-		util.DecodeJSON(resp.Body, &body)
-		return body
-	}
 }

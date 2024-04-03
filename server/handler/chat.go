@@ -139,7 +139,7 @@ func GetPendingMessages(w http.ResponseWriter, req *http.Request) {
 }
 
 func GetPubKeyHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 
 	otherUser := req.PathValue("user")
 
@@ -151,6 +151,10 @@ func GetPubKeyHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err := json.NewEncoder(w).Encode(u.PubKey)
+	util.Encode64(u.PubKey)
+
+	// para poder usar io.ReadFull, que lee hasta \0
+	_, err := w.Write([]byte(util.Encode64(u.PubKey)))
+
 	util.FailOnError(err)
 }

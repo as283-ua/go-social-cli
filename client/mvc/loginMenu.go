@@ -178,12 +178,12 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 
 	req.Header.Add("Content-Type", "text/plain")
 
-	pubkeybytes := util.ReadPublicKeyBytesFromFile(m.username.Value() + ".pub")
-	pubkey := util.ParsePublicKey(pubkeybytes)
+	// pubkeybytes := util.ReadPublicKeyBytesFromFile(m.username.Value() + ".pub")
+	// pubkey := util.ParsePublicKey(pubkeybytes)
 
-	err = util.CheckSignatureRSA(token, signature, pubkey)
+	// err = util.CheckSignatureRSA(token, signature, pubkey)
 
-	resp, _ = m.client.Do(req)
+	resp, err = m.client.Do(req)
 
 	if err != nil {
 		return nil, fmt.Errorf("error conectando con el servidor. %s", err.Error())

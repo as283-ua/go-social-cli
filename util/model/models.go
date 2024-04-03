@@ -60,4 +60,5 @@ type Chat struct {
 	UserA    string
 	UserB    string
 	Messages []Message
+	Key      []byte
 }
