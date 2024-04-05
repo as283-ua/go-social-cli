@@ -234,10 +234,8 @@ func EncryptWithRSA(data []byte, publicKey *rsa.PublicKey) ([]byte, error) {
 	return out, err
 }
 
-func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) []byte {
-	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
-	FailOnError(err)
-	return out
+func DecryptWithRSA(data []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
+	return rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
 }
 
 func SignRSA(data []byte, key *rsa.PrivateKey) ([]byte, error) {

@@ -148,14 +148,12 @@ func registerCmdLine(client *http.Client) error {
 		fmt.Print("El usuario ya existe.\n\n")
 	} else {
 		msg, _ := util.Decode64(r.Msg)
-		fmt.Printf("%s\n", util.DecryptWithRSA(msg, privateKey))
+		decrypted, _ := util.DecryptWithRSA(msg, privateKey)
+
+		fmt.Printf("%s\n", decrypted)
 		token = r.Token
 		UserName = strings.TrimSpace(username)
 	}
-
-	// fmt.Println(mensaje)
-
-	// util.DecryptWithRSA(util.EncryptWithRSA([]byte("hola"), util.ParsePublicKey(publicKeyBytes)), privateKey)
 
 	resp.Body.Close()
 	return nil
