@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"bytes"
+	"client/global"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -117,12 +118,11 @@ func (m RegisterPage) Register() ([]byte, error) {
 		// writeECDSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		util.WriteRSAKeyToFile(fmt.Sprintf("%s.key", username), privateKey)
 		publicKeyBytes = util.WritePublicKeyToFile(fmt.Sprintf("%s.pub", username), &privateKey.PublicKey)
+
+		global.SetPriv(privateKey)
+		global.SetPub(&privateKey.PublicKey)
 	} else {
-		// privateKey, err = util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
-		// if err != nil {
-		// 	return nil, err
-		// }
-		publicKeyBytes = util.ReadPublicKeyBytesFromFile(fmt.Sprintf("%s.pub", username))
+		global.LoadKeys(username)
 	}
 
 	register := model.RegisterCredentials{User: username, Pass: password, PubKey: publicKeyBytes}
@@ -131,6 +131,7 @@ func (m RegisterPage) Register() ([]byte, error) {
 	resp, err := m.client.Post("https://localhost:10443/register", "application/json", bytes.NewReader(jsonBody))
 
 	if err != nil {
+		global.ClearKeys()
 		return nil, fmt.Errorf("error al hacer la peticion. Servidor caído")
 	}
 
@@ -138,17 +139,9 @@ func (m RegisterPage) Register() ([]byte, error) {
 	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
+		global.ClearKeys()
 		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	} else {
-		// msg, _ := util.Decode64(r.Msg)
-		// dec := util.DecryptWithRSA(msg, privateKey)
-
-		// pubkey := util.ParsePublicKey(util.ReadPublicKeyBytesFromFile(username + ".pub"))
-		// privkey, _ := util.ReadRSAKeyFromFile(username + ".key")
-
-		// d, _ := util.EncryptWithRSA([]byte("Bienvenido a la red social"), pubkey)
-		// b := util.DecryptWithRSA(d, privkey)
-
 		token = r.Token
 	}
 

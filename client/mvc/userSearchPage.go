@@ -185,7 +185,8 @@ func (m UserSearchPage) View() string {
 	}
 
 	s += "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n\n"
-	s += "ctrl+r to refresh\n\n"
+	s += "ctrl+r to refresh\n"
+	s += "'m' to message user\n\n"
 
 	if m.msg != "" {
 		s += fmt.Sprintf("Info: %v\n\n", m.msg)

@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"bytes"
+	"client/global"
 	"fmt"
 	"io"
 	"net/http"
@@ -158,21 +159,24 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 	io.ReadFull(resp.Body, token)
 	resp.Body.Close()
 
-	privateKey, err := util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", m.username.Value()))
-
+	err = global.LoadKeys(m.username.Value())
 	if err != nil {
-		return nil, fmt.Errorf("error leyendo archivo de clave. %s", err.Error())
+		return nil, fmt.Errorf("no se han podido cargar las claves RSA")
 	}
+
+	privateKey := global.GetPrivateKey()
 
 	signature, err := util.SignRSA(token, privateKey)
 
 	if err != nil {
+		global.ClearKeys()
 		return nil, fmt.Errorf("error firmando token para el servidor. %s", err.Error())
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://localhost:10443/login/cert?user=%s", m.username.Value()), bytes.NewReader(signature))
 
 	if err != nil {
+		global.ClearKeys()
 		return nil, err
 	}
 
@@ -186,6 +190,7 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 	resp, err = m.client.Do(req)
 
 	if err != nil {
+		global.ClearKeys()
 		return nil, fmt.Errorf("error conectando con el servidor. %s", err.Error())
 	}
 
@@ -193,12 +198,14 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 	err = util.DecodeJSON(resp.Body, &r)
 
 	if err != nil {
+		global.ClearKeys()
 		return nil, fmt.Errorf("error decodificando JSON. %s", err.Error())
 	}
 
 	// return nil, fmt.Errorf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, token, signature, pubkeybytes)
 	// return nil, fmt.Errorf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, len(token), len(signature), len(pubkeybytes))
 	if !r.Ok {
+		global.ClearKeys()
 		return nil, fmt.Errorf("%v", r)
 	}
 
