@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"bytes"
+	"client/global"
 	"client/message"
 	"crypto/rand"
 	"encoding/json"
@@ -41,6 +42,8 @@ type ChatPage struct {
 	client     *http.Client
 	token      []byte
 }
+
+var saveKey []byte
 
 func InitialChatPageModel(myUsername string, token []byte, client *http.Client, username string) ChatPage {
 	m := ChatPage{}
@@ -207,6 +210,49 @@ func (m *ChatPage) Send() error {
 	return nil
 }
 
+func writeSaveKey(chatsPath, username string) error {
+	pubKey := global.GetPublicKey()
+
+	if saveKey == nil {
+		return fmt.Errorf("no hay saveKey")
+	}
+
+	encKey, err := util.EncryptWithRSA(saveKey, pubKey)
+	if err != nil {
+		return err
+	}
+
+	file, _ := os.Create(chatsPath + "/" + username + ".key")
+
+	defer file.Close()
+	file.Write(encKey)
+
+	return nil
+}
+
+func getSaveKey(chatsPath, username string) error {
+	privKey := global.GetPrivateKey()
+	var err error
+
+	if privKey == nil {
+		return fmt.Errorf("no hay saveKey")
+	}
+
+	var encKey []byte
+
+	file, _ := os.Open(chatsPath + "/" + username + ".key")
+
+	defer file.Close()
+	file.Read(encKey)
+
+	saveKey, err = util.DecryptWithRSA(encKey, privKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func SendKey(username string, token []byte, usernameOther string, client *http.Client) ([]byte, error) {
 	resp, err := client.Get(fmt.Sprintf("https://localhost:10443/chat/%s/pubkey", usernameOther))
 
@@ -329,8 +375,8 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 			}
 			chat.Messages = slices.Concat(chat.Messages, unread)
 		} else if newMessages { // chat nuevo iniciado por otro usuario
-			privKey, err := util.ReadRSAKeyFromFile(fmt.Sprintf("%s.key", username))
-			if err != nil {
+			privKey := global.GetPrivateKey()
+			if privKey == nil {
 				return fmt.Errorf("error obteniendo clave privada")
 			}
 
@@ -339,7 +385,10 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 				return fmt.Errorf("error decodificando mensaje")
 			}
 
-			chat.Key = util.DecryptWithRSA(decoded, privKey)
+			chat.Key, err = util.DecryptWithRSA(decoded, privKey)
+			if err != nil {
+				return fmt.Errorf("error decodificando mensaje")
+			}
 
 			unread = unread[1:]
 
