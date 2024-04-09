@@ -1,19 +1,20 @@
 package repository
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
 	"util/model"
 )
 
-func CreatePost(db *model.Database, content string, author string, group string) model.Post {
+func CreatePost(db *model.Database, content string, author string, group string) (model.Post, error) {
 	post := model.Post{Id: db.NextPostId, Content: strings.TrimSpace(content), Author: author, Group: group, Date: time.Now()}
 
 	// Si post pertenece a grupo, solo sale en feed de grupo, si no, sale publicamente para todos
 	if post.Group != "" {
-		if _, ok := (*db).GroupPosts[post.Group]; !ok {
-			(*db).GroupPosts[post.Group] = make([]int, 2)
+		if UserCanAccessGroup(db, group, author) {
+			return post, fmt.Errorf("el usuario no tiene acceso al grupo")
 		}
 
 		(*db).GroupPosts[post.Group] = append((*db).GroupPosts[post.Group], post.Id)
@@ -28,5 +29,5 @@ func CreatePost(db *model.Database, content string, author string, group string)
 
 	db.NextPostId++
 
-	return post
+	return post, nil
 }

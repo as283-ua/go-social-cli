@@ -36,6 +36,9 @@ func InitialHomeModel(username string, token []byte, client *http.Client) HomePa
 		model.options = []string{
 			"Posts",
 			"Search user",
+			"Create group",
+			"Join group",
+			"Groups",
 			"Logout",
 		}
 	}
@@ -87,6 +90,12 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmd := GetUserMsg(0, "", m.client)
 					return InitialUserSearchPageModel(m.username, m.token, "", m.client), cmd
 				case 2:
+					return InitialAccessGroupModel(m.client, m.username, m.token, 1), nil
+				case 3:
+					return InitialAccessGroupModel(m.client, m.username, m.token, 2), nil
+				case 4:
+					return InitialAccessGroupModel(m.client, m.username, m.token, 3), nil
+				case 5:
 					return InitialHomeModel("", nil, m.client), nil
 				}
 			}
