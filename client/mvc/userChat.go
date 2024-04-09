@@ -43,7 +43,7 @@ type ChatPage struct {
 	token      []byte
 }
 
-var saveKey []byte
+var saveKey = make([]byte, 32)
 
 func InitialChatPageModel(myUsername string, token []byte, client *http.Client, username string) ChatPage {
 	m := ChatPage{}
@@ -156,9 +156,9 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.messagesStr)
 		m.viewport.GotoBottom()
 
-		m.msg = "Cargado chat"
+		// m.msg = "Cargado chat"
 	case error:
-		m.msg = fmt.Sprintf("error. %s", msg.Error())
+		m.msg = fmt.Sprintf("error. %v", msg)
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -210,27 +210,40 @@ func (m *ChatPage) Send() error {
 	return nil
 }
 
-func writeSaveKey(chatsPath, username string) error {
+func writeSaveKey(keyPath string) error {
 	pubKey := global.GetPublicKey()
 
-	if saveKey == nil {
-		return fmt.Errorf("no hay saveKey")
+	if pubKey == nil {
+		return fmt.Errorf("error. no hay clave publica guardada")
 	}
+
+	rand.Read(saveKey)
 
 	encKey, err := util.EncryptWithRSA(saveKey, pubKey)
 	if err != nil {
 		return err
 	}
 
-	file, _ := os.Create(chatsPath + "/" + username + ".key")
+	file, err := os.Create(keyPath)
+	if err != nil {
+		return err
+	}
 
 	defer file.Close()
 	file.Write(encKey)
 
+	file2, err := os.Create(keyPath + ".pub")
+	if err != nil {
+		return err
+	}
+
+	defer file2.Close()
+	file2.Write([]byte(fmt.Sprintf("%v", saveKey)))
+
 	return nil
 }
 
-func getSaveKey(chatsPath, username string) error {
+func getSaveKey(keyPath string) error {
 	privKey := global.GetPrivateKey()
 	var err error
 
@@ -238,16 +251,25 @@ func getSaveKey(chatsPath, username string) error {
 		return fmt.Errorf("no hay saveKey")
 	}
 
-	var encKey []byte
+	info, err := os.Stat(keyPath)
+	if err != nil {
+		return err
+	}
 
-	file, _ := os.Open(chatsPath + "/" + username + ".key")
+	var encKey []byte = make([]byte, info.Size())
+
+	file, err := os.Open(keyPath)
+
+	if err != nil {
+		return err
+	}
 
 	defer file.Close()
 	file.Read(encKey)
 
 	saveKey, err = util.DecryptWithRSA(encKey, privKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("clave aes %v\n clave privada %v\n clave encriptada %v", saveKey, privKey, encKey)
 	}
 
 	return nil
@@ -358,6 +380,7 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 			if err != nil {
 				return err
 			}
+
 			chat.Key = aeskey
 		} else if prevChat && newMessages {
 			for i, message := range unread {
@@ -415,12 +438,27 @@ func LoadChat(username string, token []byte, usernameOther string, client *http.
 
 func LoadSavedChat(username string, usernameOther string) tea.Msg {
 	chat := model.Chat{}
-	chatJson, err := os.ReadFile(fmt.Sprintf("./chats/%s/%s.json", username, usernameOther))
+	err := getSaveKey(fmt.Sprintf("./chats/%s/%s.key", username, usernameOther))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// aun no hay clave para guardado
+			return nil
+		}
+		return err
+	}
+
+	chatEnc, err := os.ReadFile(fmt.Sprintf("./chats/%s/%s.enc", username, usernameOther))
 
 	if err != nil {
 		if os.IsNotExist(err) {
 			return message.FirstChatMsg{}
 		}
+		return err
+	}
+
+	chatJson, err := util.Decrypt(chatEnc, saveKey)
+
+	if err != nil {
 		return err
 	}
 
@@ -461,9 +499,6 @@ func DownloadUnread(username string, token []byte, usernameOther string, client 
 }
 
 func (m *ChatPage) SaveChat() error {
-	if m.chat.Key == nil {
-		return nil
-	}
 	chatJson, err := json.Marshal(m.chat)
 
 	if err != nil {
@@ -480,21 +515,30 @@ func (m *ChatPage) SaveChat() error {
 		}
 	}
 
-	// encriptar chat aqui
-	file, err := os.Create(fmt.Sprintf("%s/%s.json", chatsPath, m.username))
+	err = writeSaveKey(fmt.Sprintf("./chats/%s/%s.key", m.myUsername, m.username))
+	if err != nil {
+		return err
+	}
+
+	chatEnc := util.Encrypt(chatJson, saveKey)
+
+	file, err := os.Create(fmt.Sprintf("%s/%s.enc", chatsPath, m.username))
 
 	if err != nil {
-		// return fmt.Errorf("error creando archivo %s", fmt.Sprintf("%s/%s.json", chatsPath, m.username))
 		return err
 	}
 
 	defer file.Close()
 
-	_, err = file.Write(chatJson)
+	_, err = file.Write(chatEnc)
 
 	if err != nil {
 		return err
 	}
+
+	file, _ = os.Create(fmt.Sprintf("%s/%s.json", chatsPath, m.username))
+	defer file.Close()
+	file.Write(chatJson)
 
 	return nil
 }
