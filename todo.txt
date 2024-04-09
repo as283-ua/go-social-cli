@@ -1,18 +1,7 @@
-chat (en progreso) - andres
-punto a punto (en chat, en progreso) - andres
-
-
 crear grupos + posts de grupo + unirse [+ salirse] - alex
 
 
 roles (admin? bloquear usuarios, nuevo campo en usuario[rol y bool bloqueado]) - andres
 
 
-login con clave publica. firma digital. alternativa a lo que tenemos ya? - andres
 firma digital para origen de datos. - andres
-
-
-logging remoto - alex
-
-
-mvc cli
