@@ -50,3 +50,18 @@ func GetPaginationSizes(req *http.Request, dataLength int) (int, int, error) {
 
 	return page, size, nil
 }
+
+func PageAndSizeToStartEnd(page, size, dataLength int) (start, end int) {
+	start = page * size
+	end = (page + 1) * size
+
+	if end >= dataLength {
+		end = dataLength
+	}
+
+	if end-start < 0 {
+		end = start
+	}
+
+	return
+}

@@ -59,6 +59,14 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	rand.Read(u.Token)
 
 	u.PubKey = register.PubKey
+
+	u.Blocked = false
+	if len(data.UserNames) == 0 {
+		u.Role = model.Admin
+	} else {
+		u.Role = model.NormalUser
+	}
+
 	data.Users[u.Name] = u
 	data.UserNames = append(data.UserNames, u.Name)
 

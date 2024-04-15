@@ -20,3 +20,17 @@ type RegisterCredentials struct {
 type PostContent struct {
 	Content string
 }
+
+type UserPublicData struct {
+	Name    string
+	Blocked bool
+	Role    Role
+}
+
+func MakeUserPublicData(user User) UserPublicData {
+	return UserPublicData{
+		Name:    user.Name,
+		Blocked: user.Blocked,
+		Role:    user.Role,
+	}
+}

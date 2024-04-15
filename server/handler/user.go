@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"server/etc"
 	"server/logging"
-	"strconv"
 	"strings"
 	"util"
+	"util/model"
 )
 
 func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
@@ -21,54 +21,74 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 	name := query.Get("name")
 	usesPagination := query.Get("size") != ""
 
-	var users []string
+	var users []model.UserPublicData
 
 	if name == "" {
-		users = data.UserNames
+		n := len(data.UserNames)
+		page, size, err := etc.GetPaginationSizes(req, n)
+
+		start, end := etc.PageAndSizeToStartEnd(page, size, n)
+
+		users = make([]model.UserPublicData, end-start)
+
+		if err != nil {
+			etc.Response(w, false, "Parametros de paginación incorrectos", nil)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		i := 0
+		for _, u := range data.UserNames[start:end] {
+			users[i] = model.UserPublicData{Name: u, Blocked: data.Users[u].Blocked, Role: data.Users[u].Role}
+			i++
+		}
 	} else {
 		logging.Info(fmt.Sprintf("users with %v", name))
-		var count int
-		if usesPagination {
-			count, err = strconv.Atoi(query.Get("size"))
+
+		n := 0x7fffffff
+
+		var (
+			page, size, start, end int
+		)
+
+		if !usesPagination {
+			page = 0
+			size = n // por ejemplo
+		} else {
+			page, size, err = etc.GetPaginationSizes(req, n)
+
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-		} else {
-			count = 10 // por ejemplo
 		}
 
-		users = make([]string, 0, count)
+		start, end = etc.PageAndSizeToStartEnd(page, size, n)
 
+		logging.Info(fmt.Sprintf("Desde %v hasta %v", start, end))
+
+		users = make([]model.UserPublicData, 0)
+
+		i := 0
 		for _, u := range data.UserNames {
+			logging.Info(fmt.Sprintf("%v", u))
 			if strings.Contains(u, name) {
-				users = append(users, u)
+				logging.Info(fmt.Sprintf("%v contiene %v", u, name))
+
+				if start <= i && i < end {
+					logging.Info(fmt.Sprintf("%v esta entre %v y %v", u, start, end))
+					users = append(users, model.MakeUserPublicData(data.Users[u]))
+				}
+
+				i++
+			}
+
+			if i >= end {
+				break
 			}
 		}
 	}
 
-	page, size, err := etc.GetPaginationSizes(req, len(users))
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	start := page * size
-	end := (page + 1) * size
-
-	if end >= len(users) {
-		end = len(users)
-	}
-
-	logging.Info(fmt.Sprintf("GET users, nombre conteniendo '%s', pagina %s, tamaño %s", name, query.Get("page"), query.Get("size")))
-
-	if start > end {
-		err = json.NewEncoder(w).Encode(make([]string, 0))
-		util.FailOnError(err)
-		return
-	}
-
-	err = json.NewEncoder(w).Encode(users[start:end])
+	err = json.NewEncoder(w).Encode(users)
 	util.FailOnError(err)
 }
