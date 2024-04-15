@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"time"
+	"util/model"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -162,6 +163,7 @@ func (m UserSearchPage) View() string {
 	}
 
 	n := len(m.usernames)
+
 	if end > n {
 		end = n
 		start = end - listSize
@@ -203,16 +205,19 @@ func GetUserMsg(page int, username string, client *http.Client) func() tea.Msg {
 			return fmt.Errorf("error en la petición")
 		}
 
-		names := make([]string, usersPerReq)
+		users := make([]model.UserPublicData, usersPerReq)
 
-		err = json.NewDecoder(res.Body).Decode(&names)
+		err = json.NewDecoder(res.Body).Decode(&users)
 
 		if err != nil {
 			return fmt.Errorf("error decodificando JSON")
 		}
 
 		r := UsernamesMsg{}
-		r = append(r, names...)
+
+		for _, u := range users {
+			r = append(r, u.Name)
+		}
 
 		return r
 	}
