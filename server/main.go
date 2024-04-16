@@ -133,26 +133,31 @@ func main() {
 
 	router := http.NewServeMux()
 
+	// auth
 	router.HandleFunc("POST /register", handler.RegisterHandler)
 	router.HandleFunc("POST /login", handler.LoginHandler)
 	router.HandleFunc("GET /login/cert", handler.GetLoginCertHandler)
 	router.HandleFunc("POST /login/cert", handler.PostLoginCertHandler)
+
+	// users
 	router.HandleFunc("GET /users", handler.GetUserNamesHandler)
-	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(handler.CreatePostHandler)))
-	router.HandleFunc("GET /posts", handler.GetPostsHandler)
-	router.Handle("GET /posts/groups/{group}", middleware.Authorization(http.HandlerFunc(handler.GetGroupPostsHandler)))
-	// router.Handle("GET /chat/{user}", middleware.Authorization(http.HandlerFunc(handler.ChatConnectionHandler)))
 	router.Handle("POST /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.SendMessageHandler)))
 	router.Handle("GET /chat/{user}/message", middleware.Authorization(http.HandlerFunc(handler.GetPendingMessages)))
 	router.Handle("GET /chat/{user}/pubkey", http.HandlerFunc(handler.GetPubKeyHandler))
 
-	router.Handle("POST /noauth/chat/{user}/message", http.HandlerFunc(handler.SendMessageHandler))
-	router.Handle("GET /noauth/chat/{user}/message", http.HandlerFunc(handler.GetPendingMessages))
+	// posts
+	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(handler.CreatePostHandler)))
+	router.HandleFunc("GET /posts", handler.GetPostsHandler)
+	router.Handle("GET /posts/groups/{group}", middleware.Authorization(http.HandlerFunc(handler.GetGroupPostsHandler)))
 
 	router.Handle("POST /groups", middleware.Authorization(http.HandlerFunc(handler.CreateGroupHandler)))
 	router.Handle("POST /groups/{group}", middleware.Authorization(http.HandlerFunc(handler.JoinGroupHandler)))
 	router.Handle("POST /groups/{group}/message", middleware.Authorization(http.HandlerFunc(handler.CreateGroupPostHandler)))
 	router.Handle("GET /groups/{group}/access", middleware.Authorization(http.HandlerFunc(handler.UserCanAccessGroupHandler)))
+
+	// chat
+	router.Handle("POST /noauth/chat/{user}/message", http.HandlerFunc(handler.SendMessageHandler))
+	router.Handle("GET /noauth/chat/{user}/message", http.HandlerFunc(handler.GetPendingMessages))
 
 	server := http.Server{
 		Addr:    ":10443",

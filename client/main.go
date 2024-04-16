@@ -44,7 +44,7 @@ func printOptions() {
 }
 
 func main() {
-	cliChulo := flag.Bool("tea", false, "Use tea CLI")
+	cliFeo := flag.Bool("feo", false, "Usar CLI feo")
 	flag.Parse()
 
 	tr := &http.Transport{
@@ -53,7 +53,7 @@ func main() {
 
 	client := &http.Client{Transport: tr}
 
-	if *cliChulo {
+	if !*cliFeo {
 		p := tea.NewProgram(mvc.InitialHomeModel("", nil, client))
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %v", err)
