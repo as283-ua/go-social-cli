@@ -13,7 +13,7 @@ func CreatePost(db *model.Database, content string, author string, group string)
 
 	// Si post pertenece a grupo, solo sale en feed de grupo, si no, sale publicamente para todos
 	if post.Group != "" {
-		if UserCanAccessGroup(db, group, author) {
+		if !UserCanAccessGroup(db, group, author) {
 			return post, fmt.Errorf("el usuario no tiene acceso al grupo")
 		}
 

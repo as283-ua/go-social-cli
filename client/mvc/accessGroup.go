@@ -57,21 +57,31 @@ func (m AccessGroupPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
+			groupname := strings.TrimSpace(m.groupName.Value())
 			switch m.action {
 			case 1:
-				if strings.TrimSpace(m.groupName.Value()) != "" {
+				if groupname != "" {
 					createGroup(&m)
 				} else {
 					m.msg = "Debes introducir una cadena"
 				}
 			case 2:
-				if strings.TrimSpace(m.groupName.Value()) != "" {
+				if groupname != "" {
 					joinGroup(&m)
 				} else {
 					m.msg = "Debes introducir una cadena"
 				}
 			case 3:
-				//andres things
+				if groupname != "" {
+					listModel, err := InitialPostListModel(m.username, m.token, groupname, m.client)
+					if err != nil {
+						m.msg = err.Error()
+					} else {
+						return listModel, GetPostsMsg(0, groupname, m.client)
+					}
+				} else {
+					m.msg = "Debes introducir una cadena"
+				}
 			}
 		}
 	}

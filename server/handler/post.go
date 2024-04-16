@@ -43,10 +43,10 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := etc.GetDb(req)
 
-	post, error := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), groupName)
+	post, err := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), groupName)
 
-	if error != nil {
-		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, error.Error())
+	if err != nil {
+		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, err.Error())
 		logging.Info(logMessage)
 		logging.SendLogRemote(logMessage)
 		etc.Response(w, false, logMessage, nil)

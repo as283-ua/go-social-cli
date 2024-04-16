@@ -92,3 +92,30 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 	err = json.NewEncoder(w).Encode(users)
 	util.FailOnError(err)
 }
+
+func SetBlocked(w http.ResponseWriter, req *http.Request) {
+	otherUser := req.PathValue("user")
+
+	data := etc.GetDb(req)
+
+	if u, ok := data.Users[otherUser]; ok {
+		var block model.Block
+		err := util.DecodeJSON(req.Body, &block)
+
+		if err != nil {
+			etc.Response(w, false, "Error interno", nil)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		u.Blocked = block.Blocked
+
+		data.Users[otherUser] = u
+
+		w.WriteHeader(http.StatusOK)
+		return
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+}

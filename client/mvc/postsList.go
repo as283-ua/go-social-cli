@@ -24,6 +24,7 @@ type PostListModel struct {
 	posts    []string
 	textbox  textarea.Model
 	msg      string
+	group    string
 
 	client         *http.Client
 	username       string
@@ -44,8 +45,38 @@ type PostsMsg []model.Post
 
 const postsPerReq = 10
 
-func InitialPostListModel(username string, token []byte, client *http.Client) PostListModel {
+func comprobarAccesoGrupo(username, group string, token []byte, client *http.Client) bool {
+	if group == "" {
+		return true
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://127.0.0.1:10443/groups/%v/access", group), nil)
+	req.Header.Add("Username", username)
+	req.Header.Add("Authorization", util.Encode64(token))
+
+	if err != nil {
+		return false
+	}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return false
+	}
+
+	var objResp model.Resp
+	util.DecodeJSON(resp.Body, &objResp)
+
+	return objResp.Ok
+}
+
+func InitialPostListModel(username string, token []byte, group string, client *http.Client) (PostListModel, error) {
 	m := PostListModel{}
+
+	m.group = group
+	if !comprobarAccesoGrupo(username, group, token, client) {
+		return m, fmt.Errorf("acceso denegado")
+	}
 
 	m.client = client
 	m.username = username
@@ -69,12 +100,18 @@ func InitialPostListModel(username string, token []byte, client *http.Client) Po
 	// Remove cursor line styling
 	m.textbox.FocusedStyle.CursorLine = lipgloss.NewStyle()
 
-	return m
+	return m, nil
 }
 
-func GetPostsMsg(page int, client *http.Client) func() tea.Msg {
+func GetPostsMsg(page int, group string, client *http.Client) func() tea.Msg {
 	return func() tea.Msg {
-		res, err := client.Get(fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=%v", page, postsPerReq))
+		var url string = fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=%v", page, postsPerReq)
+
+		if group != "" {
+			url += fmt.Sprintf("&group=%v", group)
+		}
+
+		res, err := client.Get(url)
 
 		if err != nil {
 			return nil
@@ -118,7 +155,8 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "ctrl+r":
-			return InitialPostListModel(m.username, m.token, m.client), GetPostsMsg(0, m.client)
+			m, _ := InitialPostListModel(m.username, m.token, m.group, m.client)
+			return m, GetPostsMsg(0, m.group, m.client)
 		case "ctrl+s":
 			if m.token == nil {
 				m.msg = "No token. Can't post"
@@ -144,7 +182,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "down":
 			if m.viewport.AtBottom() && m.canRequestMore {
-				return m, GetPostsMsg(m.pagesLoaded, m.client)
+				return m, GetPostsMsg(m.pagesLoaded, m.group, m.client)
 			}
 		}
 	case message.ResetMsg:
@@ -184,7 +222,14 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m PostListModel) View() string {
-	s := "Posts\n\n"
+	var s string
+
+	if m.group == "" {
+		s = "Posts\n\n"
+	} else {
+
+		s = m.group + " posts\n\n"
+	}
 
 	s += "_________________________\n"
 	s += m.viewport.View() + "\n"
@@ -209,7 +254,15 @@ func (m PostListModel) View() string {
 func (m PostListModel) PublishPost() (int, error) {
 	post := model.Post{Content: m.textbox.Value()}
 	postBytes := util.EncodeJSON(post)
-	req, _ := http.NewRequest("POST", "https://127.0.0.1:10443/posts", bytes.NewReader(postBytes))
+	var url string
+
+	if m.group == "" {
+		url = "https://127.0.0.1:10443/posts"
+	} else {
+		url = fmt.Sprintf("https://127.0.0.1:10443/groups/%v/post", m.group)
+	}
+
+	req, _ := http.NewRequest("POST", url, bytes.NewReader(postBytes))
 	req.Header.Add("Username", m.username)
 	req.Header.Add("Authorization", util.Encode64(m.token))
 	res, err := m.client.Do(req)

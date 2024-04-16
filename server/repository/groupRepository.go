@@ -37,8 +37,6 @@ func UserCanAccessGroup(db *model.Database, group string, user string) bool {
 	if (*db).GroupUsers[group] == nil {
 		return false
 	}
-	if !slices.Contains((*db).GroupUsers[group], user) {
-		return false
-	}
-	return true
+
+	return slices.Contains((*db).GroupUsers[group], user)
 }

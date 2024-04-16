@@ -27,6 +27,10 @@ type UserPublicData struct {
 	Role    Role
 }
 
+type Block struct {
+	Blocked bool
+}
+
 func MakeUserPublicData(user User) UserPublicData {
 	return UserPublicData{
 		Name:    user.Name,

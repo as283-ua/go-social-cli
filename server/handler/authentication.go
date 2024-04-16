@@ -102,16 +102,25 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 
 	hash := argon2.Key([]byte(password), u.Salt, 3, 32*1024, 4, 32)
 	if !bytes.Equal(u.Hash, hash) {
+		w.WriteHeader(401)
 		etc.Response(w, false, "Credenciales inválidas", nil)
-	} else {
-		u.Seen = time.Now()
-		u.Token = make([]byte, 16)
-		rand.Read(u.Token)
-		data.Users[u.Name] = u
-
-		logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
-		etc.Response(w, true, "Credenciales válidas", u.Token)
+		return
 	}
+
+	if u.Blocked {
+		w.WriteHeader(401)
+		etc.Response(w, false, "Usuario bloqueado por el administrado", nil)
+		return
+	}
+
+	u.Seen = time.Now()
+	u.Token = make([]byte, 16)
+	rand.Read(u.Token)
+	data.Users[u.Name] = u
+
+	logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
+	etc.Response(w, true, "Credenciales válidas", u.Token)
+
 }
 
 func GetLoginCertHandler(w http.ResponseWriter, req *http.Request) {

@@ -30,8 +30,34 @@ func Authorization(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := validarToken(req.Header.Get("Username"), token, data); err != nil {
+		username := req.Header.Get("Username")
+
+		if err := validarToken(username, token, data); err != nil {
 			logging.Info(fmt.Sprintf("error de login. %s", err.Error()))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if data.Users[username].Blocked {
+			logging.Info(fmt.Sprintf("error de login. '%s' esta bloqueado", username))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
+func Admin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		username := req.Header.Get("Username")
+
+		data := req.Context().Value(ContextKeyData).(*model.Database)
+
+		user := data.Users[username]
+
+		if user.Role != model.Admin {
+			logging.Info(fmt.Sprintf("error de autorización. Usuario '%s' no es admin", username))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
