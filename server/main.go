@@ -113,11 +113,11 @@ func main() {
 	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
 	key = hash[:]
 
-	logging.Info(fmt.Sprintf("%v", len(key)))
+	logging.SendLogRemote(fmt.Sprintf("%v", len(key)))
 
 	err = loadDatabase()
 	if err != nil {
-		logging.Error(err.Error())
+		logging.SendLogRemote(err.Error())
 		os.Exit(1)
 	}
 	setupInterruptHandler()

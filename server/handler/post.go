@@ -14,7 +14,7 @@ import (
 func CreatePostHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	logging.Info(fmt.Sprintf("Publicar post de %s", req.Header.Get("Username")))
+	logging.SendLogRemote(fmt.Sprintf("Publicar post de %s", req.Header.Get("Username")))
 
 	var postContent model.PostContent
 	util.DecodeJSON(req.Body, &postContent)
@@ -24,7 +24,6 @@ func CreatePostHandler(w http.ResponseWriter, req *http.Request) {
 
 	post, _ := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), "")
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
-	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
 	etc.Response(w, true, fmt.Sprintf("%v", post.Id), nil)
@@ -35,7 +34,7 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 
 	groupName := req.PathValue("group")
 
-	logging.Info(fmt.Sprintf("Publicar post de %s en %s", req.Header.Get("Username"), groupName))
+	logging.SendLogRemote(fmt.Sprintf("Publicar post de %s en %s", req.Header.Get("Username"), groupName))
 
 	var postContent model.PostContent
 	util.DecodeJSON(req.Body, &postContent)
@@ -47,14 +46,12 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, err.Error())
-		logging.Info(logMessage)
 		logging.SendLogRemote(logMessage)
 		etc.Response(w, false, logMessage, nil)
 		return
 	}
 
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
-	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
 	etc.Response(w, true, fmt.Sprintf("%v", post.Id), nil)
@@ -64,7 +61,7 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 func GetPostsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	logging.Info(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
+	logging.SendLogRemote(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
 
 	data := etc.GetDb(req)
 
@@ -99,11 +96,11 @@ func GetPostsHandler(w http.ResponseWriter, req *http.Request) {
 		posts[i] = data.Posts[id]
 	}
 
-	logging.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
+	logging.SendLogRemote(fmt.Sprintf("Enviados posts con id: %v", postids))
 
 	err = json.NewEncoder(w).Encode(posts)
 	if err != nil {
-		logging.Error("Error enviando")
+		logging.SendLogRemote("Error enviando")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -111,7 +108,7 @@ func GetPostsHandler(w http.ResponseWriter, req *http.Request) {
 func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	logging.Info(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
+	logging.SendLogRemote(fmt.Sprintf("Peticion GET para posts en pagina %v", req.URL.Query().Get("page")))
 
 	data := etc.GetDb(req)
 
@@ -146,11 +143,11 @@ func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 		posts[i] = data.Posts[id]
 	}
 
-	logging.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
+	logging.SendLogRemote(fmt.Sprintf("Enviados posts con id: %v", postids))
 
 	err = json.NewEncoder(w).Encode(posts)
 	if err != nil {
-		logging.Error("Error enviando")
+		logging.SendLogRemote("Error enviando")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

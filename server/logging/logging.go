@@ -26,25 +26,25 @@ func init() {
 	client = &http.Client{Transport: tr}
 }
 
-func Debug(msg string) {
-	defaultLogger.Debug(msg)
-}
+// func Debug(msg string) {
+// 	defaultLogger.Debug(msg)
+// }
 
-func Error(msg string) {
-	defaultLogger.Error(msg)
-}
+// func Error(msg string) {
+// 	defaultLogger.Error(msg)
+// }
 
-func Errorf(msg string, a ...any) {
-	defaultLogger.Error(fmt.Sprintf(msg, a...))
-}
+// func Errorf(msg string, a ...any) {
+// 	defaultLogger.Error(fmt.Sprintf(msg, a...))
+// }
 
-func Info(msg string) {
-	defaultLogger.Info(msg)
-}
+// func Info(msg string) {
+// 	defaultLogger.Info(msg)
+// }
 
-func Warn(msg string) {
-	defaultLogger.Warn(msg)
-}
+// func Warn(msg string) {
+// 	defaultLogger.Warn(msg)
+// }
 
 func SendLogRemote(action string) {
 	currentTime := time.Now().Format("2006/01/02 15:04:05")

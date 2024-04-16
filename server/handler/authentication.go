@@ -33,7 +33,6 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	logMessage := fmt.Sprintf("Registro: %v\n", register)
-	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -87,7 +86,6 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	req.Body.Close()
 
 	logMessage := fmt.Sprintf("Login: %v", login)
-	logging.Info(logMessage)
 	logging.SendLogRemote(logMessage)
 
 	data := etc.GetDb(req)
@@ -118,7 +116,7 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	rand.Read(u.Token)
 	data.Users[u.Name] = u
 
-	logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
+	// logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
 	etc.Response(w, true, "Credenciales válidas", u.Token)
 
 }
@@ -128,14 +126,14 @@ func GetLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 
 	username := req.URL.Query().Get("user")
 
-	logging.Info(fmt.Sprintf("Login por certificado GET, %s", username))
+	logging.SendLogRemote(fmt.Sprintf("Login por certificado GET, %s", username))
 
 	data := etc.GetDb(req)
 
 	_, ok := data.Users[username]
 
 	if !ok {
-		logging.Info(fmt.Sprintf("Usuario %s no encontrado", username))
+		logging.SendLogRemote(fmt.Sprintf("Usuario %s no encontrado", username))
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -154,7 +152,7 @@ func GetLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 		_, ok = data.PendingCertLogin[username]
 		if ok {
 			delete(data.PendingCertLogin, username)
-			logging.Info(fmt.Sprintf("Timeout login por certificado para usuario, %s", username))
+			logging.SendLogRemote(fmt.Sprintf("Timeout login por certificado para usuario, %s", username))
 		}
 	}()
 }
@@ -164,22 +162,22 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 
 	username := req.URL.Query().Get("user")
 
-	logging.Info(fmt.Sprintf("Login por certificado POST, %s", username))
+	logging.SendLogRemote(fmt.Sprintf("Login por certificado POST, %s", username))
 
 	data := etc.GetDb(req)
 
 	user, ok := data.Users[username]
 
 	if !ok {
-		logging.Info(fmt.Sprintf("Usuario no encontrado, %s", username))
+		logging.SendLogRemote(fmt.Sprintf("Usuario no encontrado, %s", username))
 		w.WriteHeader(http.StatusNotFound)
-		logging.Info(fmt.Sprintf("Usuario %s no encontrado", username))
+		logging.SendLogRemote(fmt.Sprintf("Usuario %s no encontrado", username))
 		return
 	}
 
 	realToken, ok := data.PendingCertLogin[username]
 	if !ok {
-		logging.Info("Token expirado")
+		logging.SendLogRemote("ERROR: Token expirado")
 		w.WriteHeader(http.StatusBadRequest)
 		etc.Response(w, false, "Token expirado", nil)
 		return
@@ -191,7 +189,7 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	err := util.CheckSignatureRSA(realToken, signature, util.ParsePublicKey(user.PubKey))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		logging.Info("Clave incorrecta")
+		logging.SendLogRemote("ERROR: Clave incorrecta")
 		etc.Response(w, false, "Clave RSA incorrecta", nil)
 		return
 	}
@@ -203,7 +201,7 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	user.Seen = time.Now()
 	data.Users[username] = user
 
-	logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", username, user.Seen.Format(time.RFC3339)))
+	logging.SendLogRemote(fmt.Sprintf("Último login del usuario '%s': %s", username, user.Seen.Format(time.RFC3339)))
 
 	etc.Response(w, true, "Autenticación exitosa", []byte(util.Encode64(user.Token)))
 }

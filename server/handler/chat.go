@@ -15,7 +15,7 @@ var ActiveConnections = make(map[string]chan string)
 var NewConnections = make(chan string)
 
 func ChatConnectionHandler(w http.ResponseWriter, req *http.Request) {
-	logging.Info("Chat handler")
+	logging.SendLogRemote("Chat handler")
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -69,11 +69,11 @@ func ChatConnectionHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
-	logging.Info("Send message handler")
+	logging.SendLogRemote("Send message handler")
 
 	var msg model.Message
 	if err := util.DecodeJSON(req.Body, &msg); err != nil {
-		logging.Error("Error de JSON")
+		logging.SendLogRemote("ERROR: Error de JSON")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -81,10 +81,10 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 	otherUser := req.PathValue("user")
 	reqUser := req.Header.Get("Username")
 
-	logging.Info(fmt.Sprintf("msg received %v from %s to %s", msg.Message, reqUser, otherUser))
+	logging.SendLogRemote(fmt.Sprintf("msg received %v from %s to %s", msg.Message, reqUser, otherUser))
 
 	if otherUser == reqUser {
-		logging.Error("Nombres iguales")
+		logging.SendLogRemote("ERROR: Nombres iguales")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -94,7 +94,7 @@ func SendMessageHandler(w http.ResponseWriter, req *http.Request) {
 	_, ok := data.Users[otherUser]
 
 	if !ok {
-		logging.Error("Usuario no encontrado")
+		logging.SendLogRemote("ERROR: Usuario no encontrado")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -130,7 +130,7 @@ func GetPendingMessages(w http.ResponseWriter, req *http.Request) {
 
 	err := json.NewEncoder(w).Encode(msgs)
 	if err != nil {
-		logging.Error("Error json")
+		logging.SendLogRemote("ERROR: Error json")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

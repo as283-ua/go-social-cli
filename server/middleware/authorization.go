@@ -16,7 +16,7 @@ func Authorization(next http.Handler) http.Handler {
 
 		// logging.Info(fmt.Sprintf("Token %v", token))
 		if err != nil {
-			logging.Info("error de login. No se ha podido decodificar el header 'Authorization'")
+			logging.SendLogRemote("Error de login. No se ha podido decodificar el header 'Authorization'")
 			w.WriteHeader(http.StatusInternalServerError)
 			util.FailOnError(err)
 			return
@@ -25,7 +25,7 @@ func Authorization(next http.Handler) http.Handler {
 		data := req.Context().Value(ContextKeyData).(*model.Database)
 
 		if data == nil {
-			logging.Info("DB nil")
+			logging.SendLogRemote("DB nil")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -33,13 +33,13 @@ func Authorization(next http.Handler) http.Handler {
 		username := req.Header.Get("Username")
 
 		if err := validarToken(username, token, data); err != nil {
-			logging.Info(fmt.Sprintf("error de login. %s", err.Error()))
+			logging.SendLogRemote(fmt.Sprintf("Error de login. %s", err.Error()))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if data.Users[username].Blocked {
-			logging.Info(fmt.Sprintf("error de login. '%s' esta bloqueado", username))
+			logging.SendLogRemote(fmt.Sprintf("Error de login. %s esta bloqueado", username))
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -57,7 +57,8 @@ func Admin(next http.Handler) http.Handler {
 		user := data.Users[username]
 
 		if user.Role != model.Admin {
-			logging.Info(fmt.Sprintf("error de autorización. Usuario '%s' no es admin", username))
+			logging.SendLogRemote(fmt.Sprintf("Error de autorización. Usuario '%s' no es admin", username))
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
