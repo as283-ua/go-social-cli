@@ -43,7 +43,7 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 			i++
 		}
 	} else {
-		logging.Info(fmt.Sprintf("users with %v", name))
+		logging.SendLogRemote(fmt.Sprintf("Users with %v", name))
 
 		n := 0x7fffffff
 
@@ -65,18 +65,19 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 
 		start, end = etc.PageAndSizeToStartEnd(page, size, n)
 
-		logging.Info(fmt.Sprintf("Desde %v hasta %v", start, end))
+		logging.SendLogRemote(fmt.Sprintf("Desde %v hasta %v", start, end))
 
 		users = make([]model.UserPublicData, 0)
 
 		i := 0
 		for _, u := range data.UserNames {
-			logging.Info(fmt.Sprintf("%v", u))
+			logging.SendLogRemote(fmt.Sprintf("%v", u))
+
 			if strings.Contains(u, name) {
-				logging.Info(fmt.Sprintf("%v contiene %v", u, name))
+				logging.SendLogRemote(fmt.Sprintf("%v contiene %v", u, name))
 
 				if start <= i && i < end {
-					logging.Info(fmt.Sprintf("%v esta entre %v y %v", u, start, end))
+					logging.SendLogRemote(fmt.Sprintf("%v esta entre %v y %v", u, start, end))
 					users = append(users, model.MakeUserPublicData(data.Users[u]))
 				}
 
