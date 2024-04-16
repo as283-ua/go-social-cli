@@ -1,7 +1,11 @@
 package mvc
 
 import (
+	"bytes"
 	"net/http"
+	"strings"
+	"util"
+	"util/model"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -53,23 +57,22 @@ func (m AccessGroupPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			// var (
-			// 	token []byte
-			// 	err   error
-			// )
-
-			// if !m.cert {
-			// 	token, err = m.Login()
-			// } else {
-			// 	token, err = m.LoginCert()
-			// }
-
-			// if err != nil {
-			// 	m.msg = err.Error()
-			// 	return m, nil
-			// }
-
-			// return InitialHomeModel(m.username.Value(), token, m.client), nil
+			switch m.action {
+			case 1:
+				if strings.TrimSpace(m.groupName.Value()) != "" {
+					createGroup(&m)
+				} else {
+					m.msg = "Debes introducir una cadena"
+				}
+			case 2:
+				if strings.TrimSpace(m.groupName.Value()) != "" {
+					joinGroup(&m)
+				} else {
+					m.msg = "Debes introducir una cadena"
+				}
+			case 3:
+				//andres things
+			}
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
@@ -97,4 +100,50 @@ func (m AccessGroupPage) View() string {
 	}
 
 	return s
+}
+
+func createGroup(m *AccessGroupPage) {
+	post := model.Group{Name: strings.TrimSpace(m.groupName.Value())}
+	jsonBody := util.EncodeJSON(post)
+
+	req, err := http.NewRequest("POST", "https://localhost:10443/groups", bytes.NewReader(jsonBody))
+	util.FailOnError(err)
+	req.Header.Add("content-type", "application/json")
+
+	req.Header.Add("Authorization", util.Encode64(m.token))
+	req.Header.Add("Username", m.username)
+
+	resp, err := m.client.Do(req)
+	if err != nil {
+		m.msg = err.Error()
+	}
+
+	var r model.Resp
+	util.DecodeJSON(resp.Body, &r)
+	if r.Ok {
+		m.msg = "Grupo creado correctamente"
+	} else {
+		m.msg = r.Msg
+	}
+}
+
+func joinGroup(m *AccessGroupPage) {
+	req, err := http.NewRequest("POST", "https://localhost:10443/groups/"+m.groupName.Value(), nil)
+	util.FailOnError(err)
+
+	req.Header.Add("Authorization", util.Encode64(m.token))
+	req.Header.Add("Username", m.username)
+
+	resp, err := m.client.Do(req)
+	if err != nil {
+		m.msg = err.Error()
+	}
+
+	var r model.Resp
+	util.DecodeJSON(resp.Body, &r)
+	if r.Ok {
+		m.msg = "Ahora eres miembro del grupo " + m.groupName.Value()
+	} else {
+		m.msg = r.Msg
+	}
 }

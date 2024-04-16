@@ -21,7 +21,7 @@ func CreateGroupHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := etc.GetDb(req)
 
-	group, error := repository.CreateGroup(data, "")
+	group, error := repository.CreateGroup(data, group.Name)
 
 	if error != nil {
 		logging.SendLogRemote(error.Error())
