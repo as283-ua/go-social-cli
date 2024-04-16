@@ -162,7 +162,7 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		logging.SendLogRemote(fmt.Sprintf("Usuario no encontrado, %s", username))
 		w.WriteHeader(http.StatusNotFound)
-		logging.SendLogRemote(fmt.Sprintf("Timeout login por certificado para usuario, %s", username))
+		logging.SendLogRemote(fmt.Sprintf("Usuario %s no encontrado", username))
 		return
 	}
 
