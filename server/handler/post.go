@@ -22,7 +22,16 @@ func CreatePostHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := etc.GetDb(req)
 
-	post, _ := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), "")
+	post, err := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), "")
+
+	if err != nil {
+		w.WriteHeader(400)
+		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, err.Error())
+		logging.SendLogRemote(logMessage)
+		etc.Response(w, false, logMessage, nil)
+		return
+	}
+
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
 	logging.SendLogRemote(logMessage)
 
@@ -45,7 +54,8 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 	post, err := repository.CreatePost(data, postContent.Content, req.Header.Get("Username"), groupName)
 
 	if err != nil {
-		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, err.Error())
+		w.WriteHeader(400)
+		logMessage := fmt.Sprintf("Error creando el post:%s\n", err.Error())
 		logging.SendLogRemote(logMessage)
 		etc.Response(w, false, logMessage, nil)
 		return
@@ -112,7 +122,20 @@ func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := etc.GetDb(req)
 
-	page, size, err := etc.GetPaginationSizes(req, len(data.PostIds))
+	group := req.PathValue("group")
+	if _, ok := data.Groups[group]; !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	postIds, ok := data.GroupPostIds[group]
+
+	if !ok {
+		w.Write([]byte("[]"))
+		return
+	}
+
+	page, size, err := etc.GetPaginationSizes(req, len(postIds))
 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -121,7 +144,7 @@ func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 
 	start := page * size
 	end := start + size
-	n := len(data.PostIds)
+	n := len(postIds)
 	if end > n {
 		end = n
 	}
@@ -135,15 +158,16 @@ func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 		if n < end {
 			end = n
 		}
-		postids = data.PostIds[start:end]
+		postids = postIds[start:end]
 	}
 
 	posts := make([]model.Post, end-start)
 	for i, id := range postids {
-		posts[i] = data.Posts[id]
+		posts[i] = data.GroupPosts[id]
 	}
 
 	logging.SendLogRemote(fmt.Sprintf("Enviados posts con id: %v", postids))
+	logging.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
 
 	err = json.NewEncoder(w).Encode(posts)
 	if err != nil {

@@ -77,7 +77,7 @@ func (m AccessGroupPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						m.msg = err.Error()
 					} else {
-						return listModel, GetPostsMsg(0, groupname, m.client)
+						return listModel, GetPostsMsg(0, groupname, m.username, m.token, m.client)
 					}
 				} else {
 					m.msg = "Debes introducir una cadena"

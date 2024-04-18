@@ -53,8 +53,9 @@ func loadDatabase() error {
 				Users:            make(map[string]model.User),
 				Groups:           make(map[string]model.Group),
 				Posts:            make(map[int]model.Post),
+				GroupPosts:       make(map[int]model.Post),
 				UserPosts:        make(map[string][]int),
-				GroupPosts:       make(map[string][]int),
+				GroupPostIds:     make(map[string][]int),
 				GroupUsers:       make(map[string][]string),
 				UserGroups:       make(map[string][]string),
 				UserNames:        make([]string, 0),
@@ -79,9 +80,14 @@ func loadDatabase() error {
 	if err != nil {
 		return fmt.Errorf("clave incorrecta")
 	}
+	fmt.Println("Base de datos cargada desde db.enc")
 
 	data.PendingCertLogin = make(map[string][]byte)
-	fmt.Println("Base de datos cargada desde db.enc")
+
+	if data.GroupPosts == nil {
+		data.GroupPosts = make(map[int]model.Post)
+	}
+
 	return nil
 }
 
@@ -148,7 +154,7 @@ func main() {
 	// posts
 	router.Handle("POST /posts", middleware.Authorization(http.HandlerFunc(handler.CreatePostHandler)))
 	router.HandleFunc("GET /posts", handler.GetPostsHandler)
-	router.Handle("GET /posts/groups/{group}", middleware.Authorization(http.HandlerFunc(handler.GetGroupPostsHandler)))
+	router.Handle("GET /groups/{group}/posts", middleware.Authorization(http.HandlerFunc(handler.GetGroupPostsHandler)))
 
 	router.Handle("POST /groups", middleware.Authorization(http.HandlerFunc(handler.CreateGroupHandler)))
 	router.Handle("POST /groups/{group}", middleware.Authorization(http.HandlerFunc(handler.JoinGroupHandler)))
@@ -162,6 +168,7 @@ func main() {
 	// chat no auth
 	router.Handle("POST /noauth/chat/{user}/message", http.HandlerFunc(handler.SendMessageHandler))
 	router.Handle("GET /noauth/chat/{user}/message", http.HandlerFunc(handler.GetPendingMessages))
+	router.Handle("GET /noauth/groups/{group}/posts", http.HandlerFunc(handler.GetGroupPostsHandler))
 
 	server := http.Server{
 		Addr:    ":10443",

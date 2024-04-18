@@ -107,7 +107,7 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 
 	if u.Blocked {
 		w.WriteHeader(401)
-		etc.Response(w, false, "Usuario bloqueado por el administrado", nil)
+		etc.Response(w, false, "Usuario bloqueado por el administrador", nil)
 		return
 	}
 

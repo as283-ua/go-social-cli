@@ -21,12 +21,14 @@ func CreateGroupHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := etc.GetDb(req)
 
-	group, error := repository.CreateGroup(data, group.Name)
+	group, err := repository.CreateGroup(data, group.Name)
 
-	if error != nil {
-		logging.SendLogRemote(error.Error())
-		etc.Response(w, false, fmt.Sprintf("%v", error.Error()), nil)
+	if err != nil {
+		logging.SendLogRemote(err.Error())
+		etc.Response(w, false, fmt.Sprintf("%v", err.Error()), nil)
 	} else {
+		data.GroupUsers[group.Name] = append(data.GroupUsers[group.Name], req.Header.Get("Username"))
+
 		logging.SendLogRemote(fmt.Sprintf("Grupo creado: %s\n", group))
 		etc.Response(w, true, fmt.Sprintf("%v", group.Name), nil)
 	}

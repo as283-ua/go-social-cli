@@ -78,14 +78,14 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 2:
 					return InitialLoginModel(m.client, true), nil
 				case 3:
-					cmd := GetPostsMsg(0, "", m.client)
+					cmd := GetPostsMsg(0, "", m.username, m.token, m.client)
 					m, _ := InitialPostListModel("", nil, "", m.client)
 					return m, cmd
 				}
 			} else {
 				switch m.cursor {
 				case 0:
-					cmd := GetPostsMsg(0, "", m.client)
+					cmd := GetPostsMsg(0, "", m.username, m.token, m.client)
 					m, _ := InitialPostListModel(m.username, m.token, "", m.client)
 					return m, cmd
 				case 1:

@@ -103,18 +103,29 @@ func InitialPostListModel(username string, token []byte, group string, client *h
 	return m, nil
 }
 
-func GetPostsMsg(page int, group string, client *http.Client) func() tea.Msg {
+func GetPostsMsg(page int, group, username string, token []byte, client *http.Client) func() tea.Msg {
 	return func() tea.Msg {
-		var url string = fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=%v", page, postsPerReq)
-
-		if group != "" {
-			url += fmt.Sprintf("&group=%v", group)
+		var url string
+		if group == "" {
+			url = fmt.Sprintf("https://127.0.0.1:10443/posts?page=%v&size=%v", page, postsPerReq)
+		} else {
+			url += fmt.Sprintf("https://127.0.0.1:10443/groups/%v/posts?page=%v&size=%v", group, page, postsPerReq)
 		}
 
-		res, err := client.Get(url)
+		req, _ := http.NewRequest("GET", url, nil)
+		if group != "" {
+			req.Header.Add("Username", username)
+			req.Header.Add("Authorization", util.Encode64(token))
+		}
+
+		res, err := client.Do(req)
 
 		if err != nil {
 			return nil
+		}
+
+		if res.StatusCode != 200 {
+			return fmt.Errorf(res.Status)
 		}
 
 		posts := PostsMsg{
@@ -156,7 +167,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "ctrl+r":
 			m, _ := InitialPostListModel(m.username, m.token, m.group, m.client)
-			return m, GetPostsMsg(0, m.group, m.client)
+			return m, GetPostsMsg(0, m.group, m.username, m.token, m.client)
 		case "ctrl+s":
 			if m.token == nil {
 				m.msg = "No token. Can't post"
@@ -182,7 +193,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "down":
 			if m.viewport.AtBottom() && m.canRequestMore {
-				return m, GetPostsMsg(m.pagesLoaded, m.group, m.client)
+				return m, GetPostsMsg(m.pagesLoaded, m.group, m.username, m.token, m.client)
 			}
 		}
 	case message.ResetMsg:

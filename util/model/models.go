@@ -8,8 +8,10 @@ type Database struct {
 	Groups map[string]Group
 	Posts  map[int]Post
 
+	GroupPosts map[int]Post
+
 	UserPosts        map[string][]int
-	GroupPosts       map[string][]int
+	GroupPostIds     map[string][]int
 	GroupUsers       map[string][]string
 	UserGroups       map[string][]string
 	UserNames        []string
