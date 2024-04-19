@@ -32,7 +32,7 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 		users = make([]model.UserPublicData, end-start)
 
 		if err != nil {
-			etc.Response(w, false, "Parametros de paginación incorrectos", nil)
+			etc.ResponseSimple(w, false, "Parametros de paginación incorrectos")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -104,7 +104,7 @@ func SetBlocked(w http.ResponseWriter, req *http.Request) {
 		err := util.DecodeJSON(req.Body, &block)
 
 		if err != nil {
-			etc.Response(w, false, "Error interno", nil)
+			etc.ResponseSimple(w, false, "Error interno")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

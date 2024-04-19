@@ -147,7 +147,7 @@ func GetPubKeyHandler(w http.ResponseWriter, req *http.Request) {
 
 	u, ok := data.Users[otherUser]
 	if !ok {
-		etc.Response(w, false, "Usuario no encontrado", nil)
+		etc.ResponseSimple(w, false, "Usuario no encontrado")
 		return
 	}
 

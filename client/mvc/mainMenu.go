@@ -42,7 +42,7 @@ func InitialHomeModel(user model.User, client *http.Client) HomePage {
 		}
 
 		if m.user.Role == model.Admin {
-			m.options = append([]string{"Block User"}, m.options...)
+			m.options = append(m.options, "Block User")
 		}
 	}
 
@@ -102,6 +102,8 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return InitialAccessGroupModel(m.client, m.user, 3), nil
 				case 5:
 					return InitialHomeModel(model.User{}, m.client), nil
+				case 6:
+					return InitialBlockUserModel(m.user, m.client), nil
 				}
 			}
 		}

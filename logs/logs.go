@@ -14,7 +14,14 @@ import (
 func main() {
 
 	file, err := os.OpenFile("logs.log", os.O_APPEND|os.O_WRONLY, 0644)
-	util.FailOnError(err)
+	if err != nil {
+		if os.IsNotExist(err) {
+			file, err = os.Create("logs.log")
+			util.FailOnError(err)
+		} else {
+			util.FailOnError(err)
+		}
+	}
 
 	defer file.Close()
 
@@ -52,11 +59,11 @@ func logsHandler(w http.ResponseWriter, req *http.Request, file *os.File) {
 
 	fmt.Println(log)
 
-	response(w, true, "Log creado", nil)
+	response(w, true, "Log creado")
 }
 
-func response(w io.Writer, ok bool, msg string, token []byte) {
-	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg)), Token: token}
+func response(w io.Writer, ok bool, msg string) {
+	r := model.Resp{Ok: ok, Msg: util.Encode64([]byte(msg))}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }

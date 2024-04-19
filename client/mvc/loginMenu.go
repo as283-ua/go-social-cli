@@ -131,7 +131,7 @@ func (m LoginPage) Login() ([]byte, error) {
 		return nil, fmt.Errorf("error al hacer la peticion")
 	}
 
-	var r = model.Resp{}
+	var r = model.RespAuth{}
 	util.DecodeJSON(resp.Body, &r)
 	defer resp.Body.Close()
 
@@ -139,7 +139,7 @@ func (m LoginPage) Login() ([]byte, error) {
 		return nil, fmt.Errorf(r.Msg)
 	}
 
-	token := r.Token
+	token := r.User.Token
 
 	return token, nil
 }
@@ -194,7 +194,7 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 		return nil, fmt.Errorf("error conectando con el servidor. %s", err.Error())
 	}
 
-	r := model.Resp{}
+	r := model.RespAuth{}
 	err = util.DecodeJSON(resp.Body, &r)
 
 	if err != nil {
@@ -202,14 +202,10 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 		return nil, fmt.Errorf("error decodificando JSON. %s", err.Error())
 	}
 
-	// return nil, fmt.Errorf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, token, signature, pubkeybytes)
-	// return nil, fmt.Errorf("checks out %v, real token %v, signature %v, pubkey %v", err == nil, len(token), len(signature), len(pubkeybytes))
 	if !r.Ok {
 		global.ClearKeys()
 		return nil, fmt.Errorf("%v", r)
 	}
 
-	// return nil, fmt.Errorf("%v", r)
-
-	return util.Decode64(string(r.Token))
+	return r.User.Token, nil
 }

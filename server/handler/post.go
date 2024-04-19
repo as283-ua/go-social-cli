@@ -28,14 +28,14 @@ func CreatePostHandler(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(400)
 		logMessage := fmt.Sprintf("Error creando el post %v:%s\n", post, err.Error())
 		logging.SendLogRemote(logMessage)
-		etc.Response(w, false, logMessage, nil)
+		etc.ResponseSimple(w, false, logMessage)
 		return
 	}
 
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
 	logging.SendLogRemote(logMessage)
 
-	etc.Response(w, true, fmt.Sprintf("%v", post.Id), nil)
+	etc.ResponseSimple(w, true, fmt.Sprintf("%v", post.Id))
 }
 
 func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
@@ -57,14 +57,14 @@ func CreateGroupPostHandler(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(400)
 		logMessage := fmt.Sprintf("Error creando el post:%s\n", err.Error())
 		logging.SendLogRemote(logMessage)
-		etc.Response(w, false, logMessage, nil)
+		etc.ResponseSimple(w, false, logMessage)
 		return
 	}
 
 	logMessage := fmt.Sprintf("Creando el post: %v\n", post)
 	logging.SendLogRemote(logMessage)
 
-	etc.Response(w, true, fmt.Sprintf("%v", post.Id), nil)
+	etc.ResponseSimple(w, true, fmt.Sprintf("%v", post.Id))
 
 }
 

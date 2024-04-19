@@ -135,14 +135,14 @@ func (m RegisterPage) Register() ([]byte, error) {
 		return nil, fmt.Errorf("error al hacer la peticion. Servidor caído")
 	}
 
-	var r = model.Resp{}
+	var r = model.RespAuth{}
 	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
 		global.ClearKeys()
 		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	} else {
-		token = r.Token
+		token = r.User.Token
 	}
 
 	resp.Body.Close()

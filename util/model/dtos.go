@@ -1,9 +1,14 @@
 package model
 
 type Resp struct {
-	Ok    bool
-	Msg   string
-	Token []byte
+	Ok  bool
+	Msg string
+}
+
+type RespAuth struct {
+	Ok   bool
+	Msg  string
+	User User
 }
 
 type Credentials struct {

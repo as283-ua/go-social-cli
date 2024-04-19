@@ -23,12 +23,12 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 
 	util.DecodeJSON(req.Body, &register)
 	if register.User == "" || register.Pass == "" || register.PubKey == nil {
-		etc.Response(w, false, "Campos vacíos", nil)
+		etc.ResponseAuth(w, false, "Campos vacíos", model.User{})
 		return
 	}
 
 	if strings.ContainsAny(register.User, "@&?=/:;") {
-		etc.Response(w, false, "Carácteres no válidos '@&?=/:;'", nil)
+		etc.ResponseAuth(w, false, "Carácteres no válidos '@&?=/:;'", model.User{})
 		return
 	}
 
@@ -41,7 +41,7 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 
 	_, ok := data.Users[register.User]
 	if ok {
-		etc.Response(w, false, "Usuario ya registrado", nil)
+		etc.ResponseAuth(w, false, "Usuario ya registrado", model.User{})
 		return
 	}
 
@@ -72,10 +72,10 @@ func RegisterHandler(w http.ResponseWriter, req *http.Request) {
 	encryptedMsg, err := util.EncryptWithRSA([]byte("Bienvenido a la red social"), util.ParsePublicKey(register.PubKey))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		etc.Response(w, false, "Error de clave publica", nil)
+		etc.ResponseAuth(w, false, "Error de clave publica", model.User{})
 		return
 	}
-	etc.Response(w, true, util.Encode64(encryptedMsg), u.Token)
+	etc.ResponseAuth(w, true, util.Encode64(encryptedMsg), model.User{Name: u.Name, Token: u.Token, Role: u.Role})
 }
 
 func LoginHandler(w http.ResponseWriter, req *http.Request) {
@@ -92,7 +92,7 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 
 	u, ok := data.Users[login.User]
 	if !ok {
-		etc.Response(w, false, "Usuario inexistente", nil)
+		etc.ResponseAuth(w, false, "Usuario inexistente", model.User{})
 		return
 	}
 
@@ -101,13 +101,13 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	hash := argon2.Key([]byte(password), u.Salt, 3, 32*1024, 4, 32)
 	if !bytes.Equal(u.Hash, hash) {
 		w.WriteHeader(401)
-		etc.Response(w, false, "Credenciales inválidas", nil)
+		etc.ResponseAuth(w, false, "Credenciales inválidas", model.User{})
 		return
 	}
 
 	if u.Blocked {
 		w.WriteHeader(401)
-		etc.Response(w, false, "Usuario bloqueado por el administrador", nil)
+		etc.ResponseAuth(w, false, "Usuario bloqueado por el administrador", model.User{})
 		return
 	}
 
@@ -117,7 +117,7 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	data.Users[u.Name] = u
 
 	// logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
-	etc.Response(w, true, "Credenciales válidas", u.Token)
+	etc.ResponseAuth(w, true, "Credenciales válidas", model.User{Name: u.Name, Token: u.Token, Role: u.Role})
 
 }
 
@@ -179,7 +179,7 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		logging.SendLogRemote("ERROR: Token expirado")
 		w.WriteHeader(http.StatusBadRequest)
-		etc.Response(w, false, "Token expirado", nil)
+		etc.ResponseAuth(w, false, "Token expirado", model.User{})
 		return
 	}
 
@@ -190,7 +190,7 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		logging.SendLogRemote("ERROR: Clave incorrecta")
-		etc.Response(w, false, "Clave RSA incorrecta", nil)
+		etc.ResponseAuth(w, false, "Clave RSA incorrecta", model.User{})
 		return
 	}
 
@@ -203,5 +203,5 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 
 	logging.SendLogRemote(fmt.Sprintf("Último login del usuario '%s': %s", username, user.Seen.Format(time.RFC3339)))
 
-	etc.Response(w, true, "Autenticación exitosa", []byte(util.Encode64(user.Token)))
+	etc.ResponseAuth(w, true, "Autenticación exitosa", model.User{Name: user.Name, Token: user.Token, Role: user.Role})
 }

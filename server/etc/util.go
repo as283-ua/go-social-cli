@@ -10,8 +10,14 @@ import (
 	"util/model"
 )
 
-func Response(w io.Writer, ok bool, msg string, token []byte) {
-	r := model.Resp{Ok: ok, Msg: msg, Token: token}
+func ResponseSimple(w io.Writer, ok bool, msg string) {
+	r := model.Resp{Ok: ok, Msg: msg}
+	err := json.NewEncoder(w).Encode(&r)
+	util.FailOnError(err)
+}
+
+func ResponseAuth(w io.Writer, ok bool, msg string, user model.User) {
+	r := model.RespAuth{Ok: ok, Msg: msg, User: user}
 	err := json.NewEncoder(w).Encode(&r)
 	util.FailOnError(err)
 }

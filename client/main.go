@@ -142,7 +142,7 @@ func registerCmdLine(client *http.Client) error {
 		return fmt.Errorf("error al hacer la peticion")
 	}
 
-	var r = model.Resp{}
+	var r = model.RespAuth{}
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
 		fmt.Print("El usuario ya existe.\n\n")
@@ -151,7 +151,7 @@ func registerCmdLine(client *http.Client) error {
 		decrypted, _ := util.DecryptWithRSA(msg, privateKey)
 
 		fmt.Printf("%s\n", decrypted)
-		token = r.Token
+		token = r.User.Token
 		UserName = strings.TrimSpace(username)
 	}
 
@@ -179,7 +179,7 @@ func loginCmdLine(client *http.Client) error {
 		return fmt.Errorf("error al hacer la peticion")
 	}
 
-	var r = model.Resp{}
+	var r = model.RespAuth{}
 	util.DecodeJSON(resp.Body, &r)
 	defer resp.Body.Close()
 
@@ -189,7 +189,7 @@ func loginCmdLine(client *http.Client) error {
 		return fmt.Errorf("credenciales invalidas")
 	}
 
-	token = r.Token
+	token = r.User.Token
 	UserName = strings.TrimSpace(username)
 
 	return nil

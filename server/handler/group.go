@@ -25,12 +25,12 @@ func CreateGroupHandler(w http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		logging.SendLogRemote(err.Error())
-		etc.Response(w, false, fmt.Sprintf("%v", err.Error()), nil)
+		etc.ResponseSimple(w, false, fmt.Sprintf("%v", err.Error()))
 	} else {
 		data.GroupUsers[group.Name] = append(data.GroupUsers[group.Name], req.Header.Get("Username"))
 
 		logging.SendLogRemote(fmt.Sprintf("Grupo creado: %s\n", group))
-		etc.Response(w, true, fmt.Sprintf("%v", group.Name), nil)
+		etc.ResponseSimple(w, true, fmt.Sprintf("%v", group.Name))
 	}
 
 }
@@ -47,14 +47,14 @@ func JoinGroupHandler(w http.ResponseWriter, req *http.Request) {
 	if _, existe := data.Groups[groupName]; existe {
 		if repository.JoinGroup(data, groupName, req.Header.Get("Username")) {
 			logging.SendLogRemote(fmt.Sprintf("Agregado al grupo  %s:  %s", groupName, req.Header.Get("Username")))
-			etc.Response(w, true, "Agregado al grupo", nil)
+			etc.ResponseSimple(w, true, "Agregado al grupo")
 		} else {
 			logging.SendLogRemote("El usuario ya es miembro")
-			etc.Response(w, false, "El usuario ya es miembro", nil)
+			etc.ResponseSimple(w, false, "El usuario ya es miembro")
 		}
 	} else {
 		logging.SendLogRemote("El grupo no existe")
-		etc.Response(w, false, "El grupo no existe", nil)
+		etc.ResponseSimple(w, false, "El grupo no existe")
 	}
 }
 
@@ -69,9 +69,9 @@ func UserCanAccessGroupHandler(w http.ResponseWriter, req *http.Request) {
 
 	if repository.UserCanAccessGroup(data, groupName, req.Header.Get("Username")) {
 		logging.SendLogRemote(fmt.Sprintf("Usuario %s tiene acceso al grupo %s", groupName, req.Header.Get("Username")))
-		etc.Response(w, true, "Acceso permitido", nil)
+		etc.ResponseSimple(w, true, "Acceso permitido")
 	} else {
 		logging.SendLogRemote(fmt.Sprintf("Usuario %s no tiene acceso al grupo %s", groupName, req.Header.Get("Username")))
-		etc.Response(w, false, "Acceso denegado", nil)
+		etc.ResponseSimple(w, false, "Acceso denegado")
 	}
 }
