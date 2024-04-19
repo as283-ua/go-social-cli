@@ -53,7 +53,7 @@ func GetUserNamesHandler(w http.ResponseWriter, req *http.Request) {
 
 		if !usesPagination {
 			page = 0
-			size = n // por ejemplo
+			size = n
 		} else {
 			page, size, err = etc.GetPaginationSizes(req, n)
 

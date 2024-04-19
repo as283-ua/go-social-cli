@@ -59,6 +59,10 @@ func PageAndSizeToStartEnd(page, size, dataLength int) (start, end int) {
 		end = dataLength
 	}
 
+	if start >= dataLength {
+		start = dataLength
+	}
+
 	if end-start < 0 {
 		end = start
 	}

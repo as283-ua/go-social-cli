@@ -39,6 +39,11 @@ type UserSearchPage struct {
 	canRequestMore  bool
 }
 
+/*
+usernames es la lista de usuarios que se muestra en pantalla,
+loadedUsernames es un mapa que no se muestra en la pagina y que solo se usa para tener el recuento de qué usuarios ya se han cargado para no cargarlos de nuevo
+*/
+
 func InitialUserSearchPageModel(myUsername string, token []byte, searched string, client *http.Client) UserSearchPage {
 	model := UserSearchPage{}
 	model.client = client
@@ -130,12 +135,24 @@ func (m UserSearchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, message.SendTimedMessage(message.RequestLimitCooldown{}, 5*time.Second))
 			m.msg = "No more users"
 		} else {
-			m.pagesLoaded++
 			for _, u := range users {
 				if _, ok := m.loadedUsernames[u]; !ok {
 					m.usernames = append(m.usernames, u)
 					m.loadedUsernames[u] = true
 				}
+			}
+
+			// Si se ha recibido una lista incompleta con nombres (por ejemplo solo 2 cuando el tamaño de pagina es 5) -> hemos llegado al final de la lista
+			// si se crean nuevos usuarios mientras un usuario esta en esta situacion, estos se crearan en esta misma pagina, por lo que no se pasa de pagina a menos que
+			// el numero de usuarios sea multiplo de 5 o se haya recibido 5 en esta peticion (por si se recibe lista de usuarios ya cargados, pasar de pagina)
+			if len(m.usernames)%usersPerReq == 0 || len(users) == usersPerReq {
+				m.pagesLoaded++
+			}
+
+			if len(users) < usersPerReq {
+				m.canRequestMore = false
+				cmds = append(cmds, message.SendTimedMessage(message.RequestLimitCooldown{}, 5*time.Second))
+				m.msg = "Reached end of user list"
 			}
 		}
 
