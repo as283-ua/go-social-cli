@@ -98,25 +98,25 @@ func SetBlocked(w http.ResponseWriter, req *http.Request) {
 	otherUser := req.PathValue("user")
 
 	data := etc.GetDb(req)
+	u, ok := data.Users[otherUser]
 
-	if u, ok := data.Users[otherUser]; ok {
-		var block model.Block
-		err := util.DecodeJSON(req.Body, &block)
-
-		if err != nil {
-			etc.ResponseSimple(w, false, "Error interno")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		u.Blocked = block.Blocked
-
-		data.Users[otherUser] = u
-
-		w.WriteHeader(http.StatusOK)
-		return
-	} else {
+	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+
+	var block model.Block
+	err := util.DecodeJSON(req.Body, &block)
+
+	if err != nil {
+		etc.ResponseSimple(w, false, "Error interno")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	u.Blocked = block.Blocked
+
+	data.Users[otherUser] = u
+
+	w.WriteHeader(http.StatusOK)
 }

@@ -162,7 +162,7 @@ func main() {
 	router.Handle("GET /groups/{group}/access", middleware.Authorization(http.HandlerFunc(handler.UserCanAccessGroupHandler)))
 
 	// cosas admin
-	router.Handle("GET /users/{user}/block", middleware.Authorization(middleware.Admin(http.HandlerFunc(handler.SetBlocked))))
+	router.Handle("POST /users/{user}/block", middleware.Authorization(middleware.Admin(http.HandlerFunc(handler.SetBlocked))))
 	router.Handle("POST /noauth/users/{user}/block", http.HandlerFunc(handler.SetBlocked))
 
 	// chat no auth

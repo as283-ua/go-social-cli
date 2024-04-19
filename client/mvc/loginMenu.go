@@ -202,7 +202,7 @@ func (m LoginPage) LoginCert() (model.User, error) {
 
 	if !r.Ok {
 		global.ClearKeys()
-		return model.User{}, fmt.Errorf("%v", r)
+		return model.User{}, fmt.Errorf("%v", r.Msg)
 	}
 
 	return r.User, nil

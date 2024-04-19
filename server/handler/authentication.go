@@ -117,7 +117,7 @@ func LoginHandler(w http.ResponseWriter, req *http.Request) {
 	data.Users[u.Name] = u
 
 	// logging.Info(fmt.Sprintf("Último login del usuario '%s': %s", u.Name, u.Seen.Format(time.RFC3339)))
-	etc.ResponseAuth(w, true, "Credenciales válidas", model.User{Name: u.Name, Token: u.Token, Role: u.Role})
+	etc.ResponseAuth(w, true, "Credenciales válidas", u)
 
 }
 
@@ -196,6 +196,12 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 
 	delete(data.PendingCertLogin, username)
 
+	if user.Blocked {
+		w.WriteHeader(401)
+		etc.ResponseAuth(w, false, "Usuario bloqueado por el administrador", model.User{})
+		return
+	}
+
 	user.Token = make([]byte, 16)
 	rand.Read(user.Token)
 	user.Seen = time.Now()
@@ -203,5 +209,5 @@ func PostLoginCertHandler(w http.ResponseWriter, req *http.Request) {
 
 	logging.SendLogRemote(fmt.Sprintf("Último login del usuario '%s': %s", username, user.Seen.Format(time.RFC3339)))
 
-	etc.ResponseAuth(w, true, "Autenticación exitosa", model.User{Name: user.Name, Token: user.Token, Role: user.Role})
+	etc.ResponseAuth(w, true, "Autenticación exitosa", user)
 }

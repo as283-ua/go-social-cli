@@ -1,7 +1,10 @@
 package mvc
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
+	"util"
 	"util/model"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -95,7 +98,19 @@ func (m BlockUserPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case 1:
 				m.selectingBlockOption = !m.selectingBlockOption
 			case 2:
-				m.requestBlock()
+				err := m.requestBlock()
+
+				if err != nil {
+					m.msg = err.Error()
+				} else {
+					var accion string
+					if m.block {
+						accion = "Bloqueado"
+					} else {
+						accion = "Desbloqueado"
+					}
+					m.msg = fmt.Sprintf("%v usuario %v", accion, m.username.Value())
+				}
 			}
 		}
 	}
@@ -108,19 +123,21 @@ func (m BlockUserPage) View() string {
 	s += m.username.View() + "\n"
 
 	if m.cursor == 1 {
-		s += m.selectStyle.Render("Block/Unblock") + "\n"
+		s += m.selectStyle.Render(">") + " "
+	} else {
+		s += "> "
+	}
+
+	if m.block {
+		s += m.selectStyle.Render(m.blockOptions[0]) + "/" + m.blockOptions[1]
+	} else {
+		s += m.blockOptions[0] + "/" + m.selectStyle.Render(m.blockOptions[1])
 	}
 
 	if m.selectingBlockOption {
-		if m.block {
-			s += "\t" + m.selectStyle.Render(m.blockOptions[0]) + "\n"
-			s += "\t" + m.blockOptions[1] + "\n"
-		} else {
-			s += "\t" + m.blockOptions[0] + "\n"
-			s += "\t" + m.selectStyle.Render(m.blockOptions[1]) + "\n"
-		}
+		s += " " + m.selectStyle.Render("<") + "\n"
 	} else {
-		s += "\n\n"
+		s += "\n"
 	}
 
 	if m.cursor == 2 {
@@ -136,6 +153,28 @@ func (m BlockUserPage) View() string {
 	return s
 }
 
-func (m BlockUserPage) requestBlock() {
+func (m BlockUserPage) requestBlock() error {
+	block := model.Block{Blocked: m.block}
 
+	blockJson := util.EncodeJSON(block)
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://127.0.0.1:10443/users/%v/block", m.username.Value()), bytes.NewReader(blockJson))
+
+	req.Header.Add("Authorization", util.Encode64(m.user.Token))
+	req.Header.Add("Username", m.user.Name)
+
+	if err != nil {
+		return err
+	}
+
+	resp, err := m.client.Do(req)
+
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("error actualizando estado del usuario %v. Status code: %v", m.username.Value(), resp.Status)
+	}
+
+	return nil
 }
