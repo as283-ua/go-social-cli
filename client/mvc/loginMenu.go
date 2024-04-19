@@ -70,14 +70,14 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "enter":
 			var (
-				token []byte
-				err   error
+				user model.User
+				err  error
 			)
 
 			if !m.cert {
-				token, err = m.Login()
+				user, err = m.Login()
 			} else {
-				token, err = m.LoginCert()
+				user, err = m.LoginCert()
 			}
 
 			if err != nil {
@@ -85,7 +85,7 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			return InitialHomeModel(model.User{Name: m.username.Value(), Token: token}, m.client), nil
+			return InitialHomeModel(user, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
@@ -119,7 +119,7 @@ func (m LoginPage) View() string {
 	return s
 }
 
-func (m LoginPage) Login() ([]byte, error) {
+func (m LoginPage) Login() (model.User, error) {
 	username := m.username.Value()
 	password := m.password.Value()
 
@@ -128,7 +128,7 @@ func (m LoginPage) Login() ([]byte, error) {
 
 	resp, err := m.client.Post("https://localhost:10443/login", "application/json", bytes.NewReader(jsonBody))
 	if err != nil {
-		return nil, fmt.Errorf("error al hacer la peticion")
+		return model.User{}, fmt.Errorf("error al hacer la peticion")
 	}
 
 	var r = model.RespAuth{}
@@ -136,23 +136,21 @@ func (m LoginPage) Login() ([]byte, error) {
 	defer resp.Body.Close()
 
 	if !r.Ok {
-		return nil, fmt.Errorf(r.Msg)
+		return model.User{}, fmt.Errorf(r.Msg)
 	}
 
-	token := r.User.Token
-
-	return token, nil
+	return r.User, nil
 }
 
-func (m LoginPage) LoginCert() ([]byte, error) {
+func (m LoginPage) LoginCert() (model.User, error) {
 	resp, err := m.client.Get(fmt.Sprintf("https://localhost:10443/login/cert?user=%s", m.username.Value()))
 
 	if err != nil {
-		return nil, fmt.Errorf("error conectando con el servidor. %s", err.Error())
+		return model.User{}, fmt.Errorf("error conectando con el servidor. %s", err.Error())
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("usuario no encontrado")
+		return model.User{}, fmt.Errorf("usuario no encontrado")
 	}
 
 	token := make([]byte, 32)
@@ -161,7 +159,7 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 
 	err = global.LoadKeys(m.username.Value())
 	if err != nil {
-		return nil, fmt.Errorf("no se han podido cargar las claves RSA")
+		return model.User{}, fmt.Errorf("no se han podido cargar las claves RSA")
 	}
 
 	privateKey := global.GetPrivateKey()
@@ -170,14 +168,14 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 
 	if err != nil {
 		global.ClearKeys()
-		return nil, fmt.Errorf("error firmando token para el servidor. %s", err.Error())
+		return model.User{}, fmt.Errorf("error firmando token para el servidor. %s", err.Error())
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://localhost:10443/login/cert?user=%s", m.username.Value()), bytes.NewReader(signature))
 
 	if err != nil {
 		global.ClearKeys()
-		return nil, err
+		return model.User{}, err
 	}
 
 	req.Header.Add("Content-Type", "text/plain")
@@ -191,7 +189,7 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 
 	if err != nil {
 		global.ClearKeys()
-		return nil, fmt.Errorf("error conectando con el servidor. %s", err.Error())
+		return model.User{}, fmt.Errorf("error conectando con el servidor. %s", err.Error())
 	}
 
 	r := model.RespAuth{}
@@ -199,13 +197,13 @@ func (m LoginPage) LoginCert() ([]byte, error) {
 
 	if err != nil {
 		global.ClearKeys()
-		return nil, fmt.Errorf("error decodificando JSON. %s", err.Error())
+		return model.User{}, fmt.Errorf("error decodificando JSON. %s", err.Error())
 	}
 
 	if !r.Ok {
 		global.ClearKeys()
-		return nil, fmt.Errorf("%v", r)
+		return model.User{}, fmt.Errorf("%v", r)
 	}
 
-	return r.User.Token, nil
+	return r.User, nil
 }

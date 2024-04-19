@@ -64,14 +64,14 @@ func (m RegisterPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
-			token, err := m.Register()
+			user, err := m.Register()
 			if err != nil {
 				m.msg = err.Error()
 				return m, nil
 			}
 
 			// token := []byte("token")
-			return InitialHomeModel(model.User{Name: m.username.Value(), Token: token}, m.client), nil
+			return InitialHomeModel(user, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)
@@ -99,12 +99,12 @@ func (m RegisterPage) View() string {
 	return s
 }
 
-func (m RegisterPage) Register() ([]byte, error) {
+func (m RegisterPage) Register() (model.User, error) {
 	username := m.username.Value()
 	password := m.password.Value()
 
 	if username == "" || password == "" {
-		return nil, fmt.Errorf("username and password must not be empty")
+		return model.User{}, fmt.Errorf("username and password must not be empty")
 	}
 
 	var publicKeyBytes []byte
@@ -132,19 +132,16 @@ func (m RegisterPage) Register() ([]byte, error) {
 
 	if err != nil {
 		global.ClearKeys()
-		return nil, fmt.Errorf("error al hacer la peticion. Servidor caído")
+		return model.User{}, fmt.Errorf("error al hacer la peticion. Servidor caído")
 	}
 
 	var r = model.RespAuth{}
-	var token []byte
 	util.DecodeJSON(resp.Body, &r)
 	if !r.Ok {
 		global.ClearKeys()
-		return nil, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
-	} else {
-		token = r.User.Token
+		return model.User{}, fmt.Errorf("%s, %s, %s", r.Msg, username, password)
 	}
 
 	resp.Body.Close()
-	return token, nil
+	return r.User, nil
 }
