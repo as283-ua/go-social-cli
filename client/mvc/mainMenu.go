@@ -3,6 +3,7 @@ package mvc
 import (
 	"fmt"
 	"net/http"
+	"util/model"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,28 +13,26 @@ type HomePage struct {
 	options     []string
 	cursor      int
 	cursorStyle lipgloss.Style
-	username    string
 
 	client *http.Client
-	token  []byte
+	user   model.User
 }
 
-func InitialHomeModel(username string, token []byte, client *http.Client) HomePage {
-	model := HomePage{}
-	model.username = username
+func InitialHomeModel(user model.User, client *http.Client) HomePage {
+	m := HomePage{}
+	m.user = user
 
-	model.client = client
-	model.token = token
+	m.client = client
 
-	if model.token == nil {
-		model.options = []string{
+	if m.user.Token == nil {
+		m.options = []string{
 			"Register",
 			"Login",
 			"Login with certificate",
 			"Posts",
 		}
 	} else {
-		model.options = []string{
+		m.options = []string{
 			"Posts",
 			"Search user",
 			"Create group",
@@ -41,11 +40,15 @@ func InitialHomeModel(username string, token []byte, client *http.Client) HomePa
 			"See group posts",
 			"Logout",
 		}
+
+		if m.user.Role == model.Admin {
+			m.options = append([]string{"Block User"}, m.options...)
+		}
 	}
 
-	model.cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000")).Background(lipgloss.Color("#FFF"))
+	m.cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000")).Background(lipgloss.Color("#FFF"))
 
-	return model
+	return m
 }
 
 func (m HomePage) Init() tea.Cmd {
@@ -69,7 +72,7 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", "right":
-			if m.token == nil {
+			if m.user.Token == nil {
 				switch m.cursor {
 				case 0:
 					return InitialRegisterModel(m.client), nil
@@ -78,27 +81,27 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case 2:
 					return InitialLoginModel(m.client, true), nil
 				case 3:
-					cmd := GetPostsMsg(0, "", m.username, m.token, m.client)
-					m, _ := InitialPostListModel("", nil, "", m.client)
+					cmd := GetPostsMsg(0, "", "", nil, m.client)
+					m, _ := InitialPostListModel(model.User{}, "", m.client)
 					return m, cmd
 				}
 			} else {
 				switch m.cursor {
 				case 0:
-					cmd := GetPostsMsg(0, "", m.username, m.token, m.client)
-					m, _ := InitialPostListModel(m.username, m.token, "", m.client)
+					cmd := GetPostsMsg(0, "", m.user.Name, m.user.Token, m.client)
+					m, _ := InitialPostListModel(m.user, "", m.client)
 					return m, cmd
 				case 1:
 					cmd := GetUserMsg(0, "", m.client)
-					return InitialUserSearchPageModel(m.username, m.token, "", m.client), cmd
+					return InitialUserSearchPageModel(m.user, "", m.client), cmd
 				case 2:
-					return InitialAccessGroupModel(m.client, m.username, m.token, 1), nil
+					return InitialAccessGroupModel(m.client, m.user, 1), nil
 				case 3:
-					return InitialAccessGroupModel(m.client, m.username, m.token, 2), nil
+					return InitialAccessGroupModel(m.client, m.user, 2), nil
 				case 4:
-					return InitialAccessGroupModel(m.client, m.username, m.token, 3), nil
+					return InitialAccessGroupModel(m.client, m.user, 3), nil
 				case 5:
-					return InitialHomeModel("", nil, m.client), nil
+					return InitialHomeModel(model.User{}, m.client), nil
 				}
 			}
 		}
@@ -108,8 +111,8 @@ func (m HomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m HomePage) View() string {
 	var s string
-	if m.username != "" {
-		s = fmt.Sprintf("Hola, %s\n\n", m.username)
+	if m.user.Name != "" {
+		s = fmt.Sprintf("Hola, %s\n\n", m.user.Name)
 	}
 	s += "Opciones disponibles:\n"
 

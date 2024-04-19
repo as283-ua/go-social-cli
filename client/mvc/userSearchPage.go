@@ -31,9 +31,8 @@ type UserSearchPage struct {
 	cursorStyle lipgloss.Style
 
 	searched        string
-	myUsername      string
 	client          *http.Client
-	token           []byte
+	user            model.User
 	pagesLoaded     int
 	loadedUsernames map[string]bool
 	canRequestMore  bool
@@ -44,12 +43,10 @@ usernames es la lista de usuarios que se muestra en pantalla,
 loadedUsernames es un mapa que no se muestra en la pagina y que solo se usa para tener el recuento de qué usuarios ya se han cargado para no cargarlos de nuevo
 */
 
-func InitialUserSearchPageModel(myUsername string, token []byte, searched string, client *http.Client) UserSearchPage {
+func InitialUserSearchPageModel(user model.User, searched string, client *http.Client) UserSearchPage {
 	model := UserSearchPage{}
 	model.client = client
-	model.myUsername = myUsername
-	model.token = token
-
+	model.user = user
 	model.usernames = make([]string, 0)
 	model.searchBar = textinput.New()
 	model.searchBar.Placeholder = "Search user..."
@@ -81,7 +78,7 @@ func (m UserSearchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "left":
-			return InitialHomeModel(m.myUsername, m.token, m.client), nil
+			return InitialHomeModel(m.user, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
 		case "down":
@@ -109,20 +106,20 @@ func (m UserSearchPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchBar.Focus()
 			}
 		case "m":
-			if m.token != nil && m.selectedUser >= 0 && m.usernames[m.selectedUser] != m.myUsername {
-				return InitialChatPageModel(m.myUsername, m.token, m.client, m.usernames[m.selectedUser]),
-					LoadChat(m.myUsername, m.token, m.usernames[m.selectedUser], m.client)
+			if m.user.Token != nil && m.selectedUser >= 0 && m.usernames[m.selectedUser] != m.user.Name {
+				return InitialChatPageModel(m.user, m.client, m.usernames[m.selectedUser]),
+					LoadChat(m.user.Name, m.user.Token, m.usernames[m.selectedUser], m.client)
 			}
 		case "enter":
 			if m.onSearchBtn {
-				return InitialUserSearchPageModel(m.myUsername, m.token, m.searchBar.Value(), m.client), GetUserMsg(0, m.searchBar.Value(), m.client)
+				return InitialUserSearchPageModel(m.user, m.searchBar.Value(), m.client), GetUserMsg(0, m.searchBar.Value(), m.client)
 			}
 		// else {
 		// // Entrar pagina usu
 		// }
 		case "ctrl+r":
 			cmd := GetUserMsg(0, "", m.client)
-			return InitialUserSearchPageModel(m.myUsername, m.token, "", m.client), cmd
+			return InitialUserSearchPageModel(m.user, "", m.client), cmd
 		}
 	case message.ResetMsg:
 		m.msg = ""

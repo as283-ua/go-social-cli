@@ -18,11 +18,10 @@ type AccessGroupPage struct {
 	client *http.Client
 	action int
 
-	username string
-	token    []byte
+	user model.User
 }
 
-func InitialAccessGroupModel(client *http.Client, username string, token []byte, action int) AccessGroupPage {
+func InitialAccessGroupModel(client *http.Client, user model.User, action int) AccessGroupPage {
 	model := AccessGroupPage{}
 
 	model.groupName = textinput.New()
@@ -32,8 +31,7 @@ func InitialAccessGroupModel(client *http.Client, username string, token []byte,
 	model.client = client
 	model.action = action
 
-	model.username = username
-	model.token = token
+	model.user = user
 
 	return model
 }
@@ -53,7 +51,7 @@ func (m AccessGroupPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "left":
-			return InitialHomeModel(m.username, m.token, m.client), nil
+			return InitialHomeModel(m.user, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
@@ -73,11 +71,11 @@ func (m AccessGroupPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case 3:
 				if groupname != "" {
-					listModel, err := InitialPostListModel(m.username, m.token, groupname, m.client)
+					listModel, err := InitialPostListModel(m.user, groupname, m.client)
 					if err != nil {
 						m.msg = err.Error()
 					} else {
-						return listModel, GetPostsMsg(0, groupname, m.username, m.token, m.client)
+						return listModel, GetPostsMsg(0, groupname, m.user.Name, m.user.Token, m.client)
 					}
 				} else {
 					m.msg = "Debes introducir una cadena"
@@ -120,8 +118,8 @@ func createGroup(m *AccessGroupPage) {
 	util.FailOnError(err)
 	req.Header.Add("content-type", "application/json")
 
-	req.Header.Add("Authorization", util.Encode64(m.token))
-	req.Header.Add("Username", m.username)
+	req.Header.Add("Authorization", util.Encode64(m.user.Token))
+	req.Header.Add("Username", m.user.Name)
 
 	resp, err := m.client.Do(req)
 	if err != nil {
@@ -141,8 +139,8 @@ func joinGroup(m *AccessGroupPage) {
 	req, err := http.NewRequest("POST", "https://localhost:10443/groups/"+m.groupName.Value(), nil)
 	util.FailOnError(err)
 
-	req.Header.Add("Authorization", util.Encode64(m.token))
-	req.Header.Add("Username", m.username)
+	req.Header.Add("Authorization", util.Encode64(m.user.Token))
+	req.Header.Add("Username", m.user.Name)
 
 	resp, err := m.client.Do(req)
 	if err != nil {

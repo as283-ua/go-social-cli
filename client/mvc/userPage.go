@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"net/http"
+	"util/model"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -9,17 +10,15 @@ import (
 type UserPage struct {
 	username string
 
-	myUsername string
-	client     *http.Client
-	token      []byte
+	user   model.User
+	client *http.Client
 }
 
-func InitialUserPageModel(myUsername string, token []byte, client *http.Client, username string) UserPage {
+func InitialUserPageModel(user model.User, client *http.Client, username string) UserPage {
 	model := UserPage{}
 	model.client = client
 	model.username = username
-	model.myUsername = myUsername
-	model.token = token
+	model.user = user
 	return model
 }
 
@@ -32,7 +31,7 @@ func (m UserPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "left":
-			return InitialHomeModel(m.myUsername, m.token, m.client), nil
+			return InitialHomeModel(m.user, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
 		}

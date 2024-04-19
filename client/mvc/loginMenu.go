@@ -65,7 +65,7 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.password.Blur()
 			}
 		case "left":
-			return InitialHomeModel("", nil, m.client), nil
+			return InitialHomeModel(model.User{}, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
 		case "enter":
@@ -85,7 +85,7 @@ func (m LoginPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			return InitialHomeModel(m.username.Value(), token, m.client), nil
+			return InitialHomeModel(model.User{Name: m.username.Value(), Token: token}, m.client), nil
 		}
 	}
 	return m, tea.Batch(passCmd, userCmd)

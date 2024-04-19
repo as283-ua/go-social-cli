@@ -27,8 +27,7 @@ type PostListModel struct {
 	group    string
 
 	client         *http.Client
-	username       string
-	token          []byte
+	user           model.User
 	pagesLoaded    int
 	postsLoaded    map[int]bool
 	canRequestMore bool
@@ -70,17 +69,16 @@ func comprobarAccesoGrupo(username, group string, token []byte, client *http.Cli
 	return objResp.Ok
 }
 
-func InitialPostListModel(username string, token []byte, group string, client *http.Client) (PostListModel, error) {
+func InitialPostListModel(user model.User, group string, client *http.Client) (PostListModel, error) {
 	m := PostListModel{}
 
 	m.group = group
-	if !comprobarAccesoGrupo(username, group, token, client) {
+	if !comprobarAccesoGrupo(user.Name, group, user.Token, client) {
 		return m, fmt.Errorf("acceso denegado")
 	}
 
 	m.client = client
-	m.username = username
-	m.token = token
+	m.user = user
 	m.canRequestMore = true
 	m.postsLoaded = make(map[int]bool)
 
@@ -153,7 +151,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		viewPortCmd tea.Cmd
 	)
 
-	if m.username != "" {
+	if m.user.Name != "" {
 		m.textbox, postTboxCmd = m.textbox.Update(msg)
 	}
 	m.viewport, viewPortCmd = m.viewport.Update(msg)
@@ -162,14 +160,14 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "left":
-			return InitialHomeModel(m.username, m.token, m.client), nil
+			return InitialHomeModel(m.user, m.client), nil
 		case "ctrl+c":
 			return m, tea.Quit
 		case "ctrl+r":
-			m, _ := InitialPostListModel(m.username, m.token, m.group, m.client)
-			return m, GetPostsMsg(0, m.group, m.username, m.token, m.client)
+			m, _ := InitialPostListModel(m.user, m.group, m.client)
+			return m, GetPostsMsg(0, m.group, m.user.Name, m.user.Token, m.client)
 		case "ctrl+s":
-			if m.token == nil {
+			if m.user.Token == nil {
 				m.msg = "No token. Can't post"
 				break
 			}
@@ -185,7 +183,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.postsLoaded[postId] = true
 
 				newPost := make([]string, 1)
-				newPost[0] = InitialPost(model.Post{Content: m.textbox.Value(), Author: m.username}).View()
+				newPost[0] = InitialPost(model.Post{Content: m.textbox.Value(), Author: m.user.Name}).View()
 				m.posts = slices.Concat(newPost, m.posts)
 
 				m.viewport.SetContent(strings.Join(m.posts, ""))
@@ -193,7 +191,7 @@ func (m PostListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "down":
 			if m.viewport.AtBottom() && m.canRequestMore {
-				return m, GetPostsMsg(m.pagesLoaded, m.group, m.username, m.token, m.client)
+				return m, GetPostsMsg(m.pagesLoaded, m.group, m.user.Name, m.user.Token, m.client)
 			}
 		}
 	case message.ResetMsg:
@@ -247,8 +245,8 @@ func (m PostListModel) View() string {
 
 	s += "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n\n"
 
-	if m.token != nil {
-		s += fmt.Sprintf("Post as %s:\n", m.username)
+	if m.user.Token != nil {
+		s += fmt.Sprintf("Post as %s:\n", m.user.Name)
 		s += m.textbox.View() + "\n"
 		s += "ctrl+s to post\n"
 	}
@@ -274,8 +272,8 @@ func (m PostListModel) PublishPost() (int, error) {
 	}
 
 	req, _ := http.NewRequest("POST", url, bytes.NewReader(postBytes))
-	req.Header.Add("Username", m.username)
-	req.Header.Add("Authorization", util.Encode64(m.token))
+	req.Header.Add("Username", m.user.Name)
+	req.Header.Add("Authorization", util.Encode64(m.user.Token))
 	res, err := m.client.Do(req)
 
 	if err != nil {

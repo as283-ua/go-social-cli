@@ -38,23 +38,21 @@ type ChatPage struct {
 	meStyle    lipgloss.Style
 	otherStyle lipgloss.Style
 
-	myUsername string
-	client     *http.Client
-	token      []byte
+	user   model.User
+	client *http.Client
 }
 
 var saveKey = make([]byte, 32)
 
-func InitialChatPageModel(myUsername string, token []byte, client *http.Client, username string) ChatPage {
+func InitialChatPageModel(user model.User, client *http.Client, username string) ChatPage {
 	m := ChatPage{}
 	m.client = client
-	m.myUsername = myUsername
-	m.token = token
+	m.user = user
 
 	m.username = username
 	m.viewport = viewport.New(80, 12)
 	m.chat = model.Chat{
-		UserA:    myUsername,
+		UserA:    user.Name,
 		UserB:    username,
 		Messages: make([]model.Message, 0),
 	}
@@ -90,12 +88,12 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "left":
 			m.SaveChat()
-			return InitialUserSearchPageModel(m.myUsername, m.token, "", m.client), GetUserMsg(0, "", m.client)
+			return InitialUserSearchPageModel(m.user, "", m.client), GetUserMsg(0, "", m.client)
 		case "ctrl+c":
 			m.SaveChat()
 			return m, tea.Quit
 		case "enter":
-			if m.token == nil {
+			if m.user.Token == nil {
 				m.msg = "Sin token. No se pudo enviar el mensaje"
 				break
 			}
@@ -109,7 +107,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.msg = err.Error()
 			} else {
 
-				message := model.Message{Sender: m.myUsername, Message: strings.TrimSpace(m.textbox.Value()), Timestamp: time.Now()}
+				message := model.Message{Sender: m.user.Name, Message: strings.TrimSpace(m.textbox.Value()), Timestamp: time.Now()}
 
 				m.chat.Messages = append(m.chat.Messages, message)
 				m.messagesStr += MessageToString(message, m.meStyle) + "\n"
@@ -128,8 +126,8 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.msg = "Chat guardado"
 			}
 		case "ctrl+r":
-			return InitialChatPageModel(m.myUsername, m.token, m.client, m.username),
-				LoadChat(m.myUsername, m.token, m.username, m.client)
+			return InitialChatPageModel(m.user, m.client, m.username),
+				LoadChat(m.user.Name, m.user.Token, m.username, m.client)
 		}
 	case message.ReceiveMessageMsg:
 		message := model.Message(msg)
@@ -144,7 +142,7 @@ func (m ChatPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.chat = model.Chat(msg)
 
 		for _, message := range m.chat.Messages {
-			if message.Sender == m.myUsername {
+			if message.Sender == m.user.Name {
 				m.messagesStr += MessageToString(message, m.meStyle) + "\n"
 			} else if message.Sender == m.username {
 				m.messagesStr += MessageToString(message, m.otherStyle) + "\n"
@@ -184,7 +182,7 @@ func (m ChatPage) View() string {
 func (m *ChatPage) Send() error {
 	url := fmt.Sprintf("https://localhost:10443/chat/%s/message", m.username)
 
-	body := model.Message{Message: util.Encode64(util.Encrypt([]byte(m.textbox.Value()), m.chat.Key)), Sender: m.myUsername}
+	body := model.Message{Message: util.Encode64(util.Encrypt([]byte(m.textbox.Value()), m.chat.Key)), Sender: m.user.Name}
 
 	bodyBytes := util.EncodeJSON(body)
 
@@ -194,8 +192,8 @@ func (m *ChatPage) Send() error {
 		return fmt.Errorf("error creando request")
 	}
 
-	req.Header.Add("Authorization", util.Encode64(m.token))
-	req.Header.Add("Username", m.myUsername)
+	req.Header.Add("Authorization", util.Encode64(m.user.Token))
+	req.Header.Add("Username", m.user.Name)
 
 	resp, err := m.client.Do(req)
 
@@ -505,7 +503,7 @@ func (m *ChatPage) SaveChat() error {
 		return fmt.Errorf("error json")
 	}
 
-	chatsPath := fmt.Sprintf("./chats/%s", m.myUsername)
+	chatsPath := fmt.Sprintf("./chats/%s", m.user.Name)
 	if _, err := os.Stat(chatsPath); os.IsNotExist(err) {
 		err = os.Mkdir(chatsPath, fs.ModePerm)
 
@@ -515,7 +513,7 @@ func (m *ChatPage) SaveChat() error {
 		}
 	}
 
-	err = writeSaveKey(fmt.Sprintf("./chats/%s/%s.key", m.myUsername, m.username))
+	err = writeSaveKey(fmt.Sprintf("./chats/%s/%s.key", m.user.Name, m.username))
 	if err != nil {
 		return err
 	}
