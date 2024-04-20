@@ -1,7 +1,1 @@
-crear grupos + posts de grupo + unirse [+ salirse] - alex
-
-
-roles (admin? bloquear usuarios, nuevo campo en usuario[rol y bool bloqueado]) - andres
-
-
 firma digital para origen de datos. - andres
