@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,6 +22,7 @@ import (
 )
 
 var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
+const keyBackup = "clave_secreta"
 
 var data model.Database
 
@@ -41,6 +44,26 @@ func saveDatabase() {
 	err := os.WriteFile("db.enc", encryptedData, 0644)
 	util.FailOnError(err)
 
+	buffer := bytes.NewBuffer(encryptedData)
+
+	req, err := http.NewRequest("POST", "https://localhost:10444/backup", buffer)
+	util.FailOnError(err)
+
+	req.Header.Add("Authorization", keyBackup)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req)
+	util.FailOnError(err)
+
+	var r = model.RespAuth{}
+	util.DecodeJSON(resp.Body, &r)
+
+	if !r.Ok {
+		fmt.Println(util.Decode64(r.Msg))
+	}
 	// fmt.Println("Base de datos guardada en", "db.enc")
 }
 

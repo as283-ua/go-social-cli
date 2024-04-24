@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 	"util"
 	"util/model"
 )
@@ -35,10 +36,50 @@ func main() {
 	router := http.NewServeMux()
 
 	router.HandleFunc("POST /logs", func(w http.ResponseWriter, r *http.Request) { logsHandler(w, r, file) })
+	router.HandleFunc("POST /backup", func(w http.ResponseWriter, r *http.Request) { backupHandler(w, r) })
 
 	server.Handler = router
 	fmt.Printf("Servidor escuchando en https://localhost:10444\n")
 	util.FailOnError(server.ListenAndServeTLS("localhost.crt", "localhost.key"))
+}
+
+func backupHandler(w http.ResponseWriter, req *http.Request) {
+
+	authHeader := req.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	authKey := strings.TrimSpace(authHeader)
+	if authKey != key {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	fecha := time.Now()
+	fechaFormato := fecha.Format("2006-01-02")
+
+	file, err := os.Create(fmt.Sprintf("./logs/backups/backup%s.enc", fechaFormato))
+	if err != nil {
+		fmt.Println("creando")
+		fmt.Println(err)
+		response(w, false, "Error al crear el archivo de backup")
+		return
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, req.Body)
+	if err != nil {
+		fmt.Println("escribiendo")
+		fmt.Println(err)
+		response(w, false, "Error al guardar el archivo de backup")
+		return
+	}
+
+	fmt.Println("Backup recibido")
+
+	response(w, true, "Backup guardado correctamente")
 }
 
 func logsHandler(w http.ResponseWriter, req *http.Request, file *os.File) {
