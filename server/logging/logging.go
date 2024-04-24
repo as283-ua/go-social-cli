@@ -10,6 +10,8 @@ import (
 	"util"
 )
 
+const key = "clave_secreta"
+
 var defaultLogger *slog.Logger
 var client *http.Client
 
@@ -47,6 +49,7 @@ func SendLogRemote(action string) {
 	logMessage := fmt.Sprintf("%s INFO %s", currentTime, action)
 
 	req, err := http.NewRequest("POST", "https://localhost:10444/logs", bytes.NewReader([]byte(logMessage)))
+	req.Header.Set("Authorization", key)
 	util.FailOnError(err)
 	client.Do(req)
 }

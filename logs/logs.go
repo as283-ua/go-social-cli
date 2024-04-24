@@ -7,9 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"util"
 	"util/model"
 )
+
+const key = "clave_secreta"
 
 func main() {
 
@@ -41,6 +44,18 @@ func main() {
 func logsHandler(w http.ResponseWriter, req *http.Request, file *os.File) {
 
 	w.Header().Set("Content-Type", "text/plain")
+
+	authHeader := req.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	authKey := strings.TrimSpace(authHeader)
+	if authKey != key {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var log string
 	body, err := io.ReadAll(req.Body)
