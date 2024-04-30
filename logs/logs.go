@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,9 +14,15 @@ import (
 	"util/model"
 )
 
-const key = "clave_secreta"
+var key string
 
 func main() {
+
+	fmt.Printf("Introduce la clave para enviar logs: ")
+	introducedKey, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	util.FailOnError(err)
+	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
+	key = util.Encode64(hash[:])
 
 	file, err := os.OpenFile("logs.log", os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {

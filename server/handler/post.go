@@ -167,7 +167,6 @@ func GetGroupPostsHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	logging.SendLogRemote(fmt.Sprintf("Enviados posts con id: %v", postids))
-	logging.Info(fmt.Sprintf("Enviados posts con id: %v", postids))
 
 	err = json.NewEncoder(w).Encode(posts)
 	if err != nil {

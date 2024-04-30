@@ -4,23 +4,16 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 	"util"
 )
 
-const key = "clave_secreta"
+var key []byte
 
-var defaultLogger *slog.Logger
 var client *http.Client
 
-func getLogger() *slog.Logger {
-	return slog.New(slog.Default().Handler())
-}
-
 func init() {
-	defaultLogger = getLogger()
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -28,20 +21,8 @@ func init() {
 	client = &http.Client{Transport: tr}
 }
 
-func Error(msg string) {
-	defaultLogger.Error(msg)
-}
-
-func Errorf(msg string, a ...any) {
-	defaultLogger.Error(fmt.Sprintf(msg, a...))
-}
-
-func Info(msg string) {
-	defaultLogger.Info(msg)
-}
-
-func Warn(msg string) {
-	defaultLogger.Warn(msg)
+func SetKey(serverKey []byte) {
+	key = serverKey
 }
 
 func SendLogRemote(action string) {
@@ -49,7 +30,7 @@ func SendLogRemote(action string) {
 	logMessage := fmt.Sprintf("%s INFO %s", currentTime, action)
 
 	req, err := http.NewRequest("POST", "https://localhost:10444/logs", bytes.NewReader([]byte(logMessage)))
-	req.Header.Set("Authorization", key)
+	req.Header.Set("Authorization", util.Encode64(key))
 	util.FailOnError(err)
 	client.Do(req)
 }

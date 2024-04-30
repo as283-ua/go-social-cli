@@ -22,7 +22,6 @@ import (
 )
 
 var key []byte //clave para encriptar y desencriptar la base de datos, se introduce manualmente al arrancar el servidor
-const keyBackup = "clave_secreta"
 
 var data model.Database
 
@@ -32,8 +31,6 @@ func saveDatabaseJSON() {
 
 	err := os.WriteFile("db.json", jsonData, 0644)
 	util.FailOnError(err)
-
-	// fmt.Println("Base de datos guardada en", "db.json")
 }
 
 func saveDatabase() {
@@ -49,7 +46,7 @@ func saveDatabase() {
 	req, err := http.NewRequest("POST", "https://localhost:10444/backup", buffer)
 	util.FailOnError(err)
 
-	req.Header.Add("Authorization", keyBackup)
+	req.Header.Add("Authorization", util.Encode64(key))
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -64,7 +61,6 @@ func saveDatabase() {
 	if !r.Ok {
 		fmt.Println(util.Decode64(r.Msg))
 	}
-	// fmt.Println("Base de datos guardada en", "db.enc")
 }
 
 func loadDatabase() error {
@@ -142,14 +138,14 @@ func main() {
 	hash := sha256.Sum256([]byte(strings.TrimSpace(introducedKey)))
 	key = hash[:]
 
-	logging.SendLogRemote(fmt.Sprintf("%v", len(key)))
-
 	err = loadDatabase()
 	if err != nil {
 		logging.SendLogRemote(err.Error())
 		os.Exit(1)
 	}
 	setupInterruptHandler()
+
+	logging.SetKey(key)
 
 	intervalo := 30 //intervalo por defecto = 30 segundos
 	if len(os.Args) == 2 {
